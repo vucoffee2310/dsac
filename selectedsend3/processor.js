@@ -1,118 +1,104 @@
 // FILE: selectedsend3/processor.js
-function escapeHtml(t) {
-  let d = document.createElement('div');
-  d.textContent = t;
-  return d.innerHTML;
+
+const STORAGE_KEY = 'clickedCards_v1';
+const LINES_PER_CARD = 200;
+const PREVIEW_LINES = 3;
+
+// --- UTILITIES ---
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
-// Unique key for storage
-const STORAGE_KEY = 'clickedCards_v1';
-
-// Load saved state and apply to UI
-function loadAndApplySavedState() {
-  chrome.storage.local.get([STORAGE_KEY], (result) => {
-    const saved = result[STORAGE_KEY] || {};
+// --- STATE & UI ---
+function applySavedState() {
+  chrome.storage.local.get(STORAGE_KEY, (result) => {
+    const clickedIds = result[STORAGE_KEY] || {};
     document.querySelectorAll('.card').forEach(card => {
-      const cardId = card.dataset.id;
-      if (saved[cardId]) {
+      if (clickedIds[card.dataset.id]) {
         card.classList.add('card-clicked');
       }
     });
   });
 }
 
-// Save clicked card state
-function saveCardClick(cardId) {
-  chrome.storage.local.get([STORAGE_KEY], (result) => {
-    const saved = result[STORAGE_KEY] || {};
-    saved[cardId] = true;
-    chrome.storage.local.set({ [STORAGE_KEY]: saved });
+function renderCards(lines) {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = ''; // Clear previous content
+
+  if (!lines.length) {
+    grid.innerHTML = '<div class="empty-state"><p>No content found in file.</p></div>';
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  for (let i = 0; i < lines.length; i += LINES_PER_CARD) {
+    const chunk = lines.slice(i, i + LINES_PER_CARD);
+    const preview = chunk.slice(0, PREVIEW_LINES).join('\n');
+    const index = Math.floor(i / LINES_PER_CARD) + 1;
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.dataset.id = `card_${index}`;
+    card.dataset.name = `Card ${index}`;
+    card.dataset.content = chunk.join('\n');
+    
+    const remaining = chunk.length - PREVIEW_LINES;
+    const moreHtml = remaining > 0 ? `<small>+${remaining} more</small>` : '';
+    const previewHtml = escapeHtml(preview).replace(/\n/g, '<br>') || '<em>(empty)</em>';
+
+    card.innerHTML = `<h3>${card.dataset.name}</h3><pre>${previewHtml}</pre>${moreHtml}`;
+    card.addEventListener('click', handleCardClick);
+    fragment.appendChild(card);
+  }
+  grid.appendChild(fragment);
+  applySavedState();
+}
+
+// --- EVENT HANDLERS ---
+function handleFileSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    const lines = e.target.result.split(/\r?\n/).filter(line => line.trim());
+    renderCards(lines);
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function handleCardClick(event) {
+  const card = event.currentTarget;
+  const { id, name, content } = card.dataset;
+  const targetUrl = "https://aistudio.google.com/";
+
+  card.classList.add('card-clicked');
+  // Save state optimistically
+  chrome.storage.local.get(STORAGE_KEY, (result) => {
+    const clickedIds = result[STORAGE_KEY] || {};
+    clickedIds[id] = true;
+    chrome.storage.local.set({ [STORAGE_KEY]: clickedIds });
+  });
+
+  chrome.tabs.create({ url: targetUrl }, (newTab) => {
+    chrome.runtime.sendMessage({
+      action: "logTabCreation",
+      payload: { id: newTab.id, url: targetUrl, title: newTab.title, timestamp: Date.now(), cardName: name, cardContent: content }
+    });
   });
 }
 
-document.getElementById('fileInput').addEventListener('change', e => {
-  let file = e.target.files[0];
-  if (!file) return;
-
-  let reader = new FileReader();
-  reader.onload = e => {
-    let lines = e.target.result.split(/\r?\n/).filter(l => l.trim());
-    let grid = document.getElementById('grid');
-    grid.innerHTML = '';
-
-    if (!lines.length) {
-      grid.innerHTML = '<div class="card"><p class="empty">No content.</p></div>';
-      return;
-    }
-
-    const L = 200, P = 3;
-    for (let i = 0; i < lines.length; i += L) {
-      let chunk = lines.slice(i, i + L);
-      let preview = chunk.slice(0, P);
-      let rem = chunk.length - P;
-      let idx = Math.floor(i / L) + 1;
-
-      // Generate unique ID and name per card
-      let cardId = `card_${idx}`;
-      let cardName = `Card ${idx}`;
-      let cardContent = chunk.join('\n');
-
-      let card = document.createElement('div');
-      card.className = 'card';
-      card.dataset.id = cardId;
-      // Store card data on the element itself for easy access on click
-      card.dataset.name = cardName;
-      card.dataset.content = cardContent;
-
-      let txt = escapeHtml(preview.join('\n')).replace(/\n/g, '<br>') || '<em>(empty)</em>';
-      let more = rem > 0 ? `<small>+${rem} more</small>` : '';
-
-      card.innerHTML = `<h3>${cardName}</h3><pre>${txt}</pre>${more}`;
-
-      card.addEventListener('click', () => {
-        // Define the target URL here to ensure consistency
-        const targetUrl = "https://aistudio.google.com/";
-        
-        // Create the tab, and in its callback, send the full data to the background script.
-        chrome.tabs.create({ url: targetUrl }, (newTab) => {
-          card.classList.add('card-clicked');
-          saveCardClick(cardId);
-          
-          // Send detailed info to the background script for monitoring
-          chrome.runtime.sendMessage({
-            action: "logTabCreation",
-            payload: {
-              id: newTab.id,
-              // FIX: Use the 'targetUrl' we defined, not 'newTab.url' which is unreliable here.
-              url: targetUrl, 
-              title: newTab.title, // Note: title might also be empty initially for the same reason
-              timestamp: Date.now(),
-              cardName: card.dataset.name,
-              cardContent: card.dataset.content
-            }
-          });
-        });
-      });
-
-      grid.appendChild(card);
-    }
-
-    // Apply saved states after rendering
-    loadAndApplySavedState();
-  };
-
-  reader.readAsText(file, 'UTF-8');
-});
-
-// Apply saved state on initial page load (if cards rendered before JS runs)
-document.addEventListener('DOMContentLoaded', loadAndApplySavedState);
-
-// Clear saved state button
-document.getElementById('clearSaved')?.addEventListener('click', () => {
+function handleClearSaved() {
   chrome.storage.local.remove(STORAGE_KEY, () => {
     alert('✅ Cleared all clicked card states.');
-    document.querySelectorAll('.card').forEach(card => {
+    document.querySelectorAll('.card.card-clicked').forEach(card => {
       card.classList.remove('card-clicked');
     });
   });
-});
+}
+
+// --- INITIALIZATION ---
+document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+document.getElementById('clearSaved').addEventListener('click', handleClearSaved);

@@ -1,18 +1,12 @@
 // FILE: selectedsend3/background.js
 
-// --- REVISED: Simplified State ---
-// We only need to track created tabs and which UI tabs are open.
+// --- REVISED: State now holds richer objects ---
 const tabState = {
-  createdTabs: []
+  createdTabs: [] // Will contain {id, url, title, timestamp, cardName, cardContent}
 };
 const processorTabs = new Set(); // Tracks open processor.html tabs
 
-function isAllowedUrl(url) {
-  return url?.startsWith("https://aistudio.google.com/");
-}
-
-// --- REVISED: More efficient state notification ---
-// Sends only the 'createdTabs' state.
+// --- REVISED: No changes needed here, just broadcasts state ---
 function notifyProcessorTabs() {
   const currentState = {
     createdTabs: [...tabState.createdTabs]
@@ -37,53 +31,45 @@ chrome.tabs.query({ url: `*://*/processor.html` }, tabs => {
 
 // --- EVENT LISTENERS (Simplified) ---
 
-// Track newly created AI Studio tabs
-chrome.tabs.onCreated.addListener(tab => {
-  if (isAllowedUrl(tab.url)) {
-    tabState.createdTabs.push({
-      id: tab.id,
-      url: tab.url,
-      title: tab.title,
-      timestamp: Date.now()
-    });
-    notifyProcessorTabs();
-  }
-});
-
-// Track when a user navigates an existing tab to AI Studio
+// Track when our processor.html UI tab is opened
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  // Logic to track when our processor.html UI tab is open
   if (changeInfo.status === 'complete' && tab.url?.includes('processor.html')) {
     processorTabs.add(tabId);
-    return; // No further action needed for this tab
-  }
-
-  // Check if an existing tab navigated to our target URL
-  const isAlreadyTracked = tabState.createdTabs.some(t => t.id === tabId);
-  if (changeInfo.url && isAllowedUrl(tab.url) && !isAlreadyTracked) {
-    tabState.createdTabs.push({
-      id: tabId,
-      url: tab.url,
-      title: tab.title,
-      timestamp: Date.now()
-    });
+    // When a new UI opens, send it the current state immediately
     notifyProcessorTabs();
   }
 });
 
-// Stop tracking closed processor.html tabs
+// Stop tracking closed tabs
 chrome.tabs.onRemoved.addListener(tabId => {
+  // If it's a closed processor UI tab, remove it from the broadcast list
   if (processorTabs.has(tabId)) {
     processorTabs.delete(tabId);
   }
+
+  // Check if the closed tab is one we are tracking for the monitor
+  const initialLength = tabState.createdTabs.length;
+  tabState.createdTabs = tabState.createdTabs.filter(t => t.id !== tabId);
+
+  // If a tracked tab was removed, notify the UI to update
+  if (tabState.createdTabs.length < initialLength) {
+    notifyProcessorTabs();
+  }
 });
 
-// --- MESSAGE HANDLING (Simplified) ---
+
+// --- MESSAGE HANDLING ---
 chrome.runtime.onMessage.addListener((req, _, sendResponse) => {
   if (req.action === "getTabState") {
     sendResponse({
       createdTabs: [...tabState.createdTabs]
     });
+  } else if (req.action === "logTabCreation") {
+    // This message comes from processor.js after a card is clicked and tab created
+    if (!tabState.createdTabs.some(t => t.id === req.payload.id)) {
+      tabState.createdTabs.push(req.payload);
+      notifyProcessorTabs();
+    }
   }
   return true; // Required for async sendResponse
 });

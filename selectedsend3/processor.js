@@ -1,3 +1,4 @@
+// FILE: selectedsend3/processor.js
 function escapeHtml(t) {
   let d = document.createElement('div');
   d.textContent = t;
@@ -51,25 +52,45 @@ document.getElementById('fileInput').addEventListener('change', e => {
       let rem = chunk.length - P;
       let idx = Math.floor(i / L) + 1;
 
-      // Generate unique ID per card
+      // Generate unique ID and name per card
       let cardId = `card_${idx}`;
+      let cardName = `Card ${idx}`;
+      let cardContent = chunk.join('\n');
 
       let card = document.createElement('div');
       card.className = 'card';
       card.dataset.id = cardId;
+      // Store card data on the element itself for easy access on click
+      card.dataset.name = cardName;
+      card.dataset.content = cardContent;
 
       let txt = escapeHtml(preview.join('\n')).replace(/\n/g, '<br>') || '<em>(empty)</em>';
       let more = rem > 0 ? `<small>+${rem} more</small>` : '';
 
-      card.innerHTML = `<h3>Card ${idx}</h3><pre>${txt}</pre>${more}`;
+      card.innerHTML = `<h3>${cardName}</h3><pre>${txt}</pre>${more}`;
 
       card.addEventListener('click', () => {
-        // The callback here ensures the UI update happens after the tab is created.
-        chrome.tabs.create({ url: "https://aistudio.google.com/" }, () => {
+        // Define the target URL here to ensure consistency
+        const targetUrl = "https://aistudio.google.com/";
+        
+        // Create the tab, and in its callback, send the full data to the background script.
+        chrome.tabs.create({ url: targetUrl }, (newTab) => {
           card.classList.add('card-clicked');
           saveCardClick(cardId);
-          // THE LINE BELOW IS REMOVED TO PREVENT THE RACE CONDITION
-          // document.getElementById('refreshButton')?.click();
+          
+          // Send detailed info to the background script for monitoring
+          chrome.runtime.sendMessage({
+            action: "logTabCreation",
+            payload: {
+              id: newTab.id,
+              // FIX: Use the 'targetUrl' we defined, not 'newTab.url' which is unreliable here.
+              url: targetUrl, 
+              title: newTab.title, // Note: title might also be empty initially for the same reason
+              timestamp: Date.now(),
+              cardName: card.dataset.name,
+              cardContent: card.dataset.content
+            }
+          });
         });
       });
 

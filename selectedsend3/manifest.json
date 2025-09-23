@@ -7,7 +7,7 @@
   "background": { "service_worker": "background.js" },
   "action": {},
   "web_accessible_resources": [{
-    "resources": ["processor.html", "processor.js", "monitor.js"],
+    "resources": ["processor.html", "processor.css", "processor.js", "monitor.js"],
     "matches": ["<all_urls>"]
   }]
 }

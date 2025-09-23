@@ -6,7 +6,30 @@ const tabState = {
 };
 const processorTabs = new Set(); // Tracks open processor.html tabs
 
-// --- REVISED: No changes needed here, just broadcasts state ---
+// --- HELPER FUNCTION FOR TAB QUERY ---
+// Encapsulate the query logic to avoid repetition
+function findExistingProcessorTabs() {
+  chrome.tabs.query({ url: chrome.runtime.getURL("processor.html") }, (tabs) => {
+    if (chrome.runtime.lastError) {
+      // This will now handle potential errors more gracefully without crashing.
+      console.error("Error querying for processor tabs:", chrome.runtime.lastError.message);
+      return;
+    }
+    if (tabs && tabs.length > 0) {
+      console.log(`Found ${tabs.length} existing processor tab(s) on startup/install.`);
+      tabs.forEach(tab => processorTabs.add(tab.id));
+    }
+  });
+}
+
+// --- INITIALIZATION (FIXED) ---
+// Find any processor.html tabs that are already open when the browser starts or extension is installed/updated.
+// This is the correct way to handle initialization logic.
+chrome.runtime.onStartup.addListener(findExistingProcessorTabs);
+chrome.runtime.onInstalled.addListener(findExistingProcessorTabs);
+
+
+// --- BROADCAST FUNCTION ---
 function notifyProcessorTabs() {
   const currentState = {
     createdTabs: [...tabState.createdTabs]
@@ -23,13 +46,7 @@ function notifyProcessorTabs() {
   }
 }
 
-// --- INITIALIZATION (Simplified) ---
-// Find any processor.html tabs that are already open on startup.
-chrome.tabs.query({ url: `*://*/processor.html` }, tabs => {
-  tabs.forEach(tab => processorTabs.add(tab.id));
-});
-
-// --- EVENT LISTENERS (Simplified) ---
+// --- EVENT LISTENERS ---
 
 // Track when our processor.html UI tab is opened
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {

@@ -3,141 +3,244 @@
 <head>
   <meta charset="utf-8">
   <title>TXT to Card Grid + AI Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --font-family: 'Inter', sans-serif;
+      --bg-color: #f7f8fc;
+      --panel-bg-color: #ffffff;
+      --text-color: #333;
+      --text-color-light: #666;
+      --border-color: #e0e0e0;
+      --accent-color: #007bff;
+      --accent-color-dark: #0056b3;
+      --danger-color: #dc3545;
+      --danger-color-dark: #c82333;
+      --success-color: #28a745;
+      --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+      --card-hover-shadow: 0 7px 14px rgba(0, 0, 0, 0.07);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
-      font-family: sans-serif;
+      font-family: var(--font-family);
       margin: 0;
-      background: #f9f9f9;
+      background-color: var(--bg-color);
+      color: var(--text-color);
       display: flex;
-      height: 100vh;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
     }
 
     .container {
       display: flex;
       width: 100%;
+      max-width: 1400px;
+      height: calc(100vh - 40px);
+      background-color: var(--panel-bg-color);
+      border-radius: 12px;
+      box-shadow: var(--card-shadow);
+      overflow: hidden;
+    }
+
+    .panel {
+      padding: 30px;
       height: 100%;
+      overflow-y: auto;
     }
 
     .left-panel {
-      flex: 1;
-      padding: 20px;
-      overflow-y: auto;
-      border-right: 1px solid #ddd;
+      flex: 1.2;
+      border-right: 1px solid var(--border-color);
     }
 
     .right-panel {
-      flex: 1;
-      padding: 20px;
-      background: #fafafa;
-      position: relative; /* Required for absolute positioning of icon */
+      flex: 0.8;
+      background-color: #fbfcfe;
+    }
+    
+    .panel-header {
+      margin-bottom: 24px;
     }
 
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-      gap: 16px;
-      margin-top: 20px;
+    .panel-header h2 {
+      margin: 0 0 10px 0;
+      font-size: 24px;
+    }
+    
+    .panel-header p {
+        margin: 0;
+        color: var(--text-color-light);
     }
 
-    .card {
-      background: white;
-      padding: 16px;
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
       border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      border: none;
       cursor: pointer;
+      font-family: var(--font-family);
+      font-weight: 500;
+      font-size: 14px;
       transition: all 0.2s ease;
     }
 
+    .btn-primary {
+      background-color: var(--accent-color);
+      color: white;
+    }
+    .btn-primary:hover {
+      background-color: var(--accent-color-dark);
+      transform: translateY(-1px);
+    }
+    
+    .btn-danger {
+      background-color: var(--danger-color);
+      color: white;
+    }
+    .btn-danger:hover {
+        background-color: var(--danger-color-dark);
+        transform: translateY(-1px);
+    }
+
+    /* Custom File Input */
+    #fileInput {
+      display: none;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--panel-bg-color);
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: var(--card-shadow);
+      border: 1px solid var(--border-color);
+      cursor: pointer;
+      transition: all 0.2s ease-in-out;
+    }
+
     .card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+      transform: translateY(-4px);
+      box-shadow: var(--card-hover-shadow);
+    }
+    
+    .card h3 {
+      margin: 0 0 12px 0;
+      font-size: 16px;
+      color: var(--accent-color);
+    }
+    
+    .card pre {
+      margin: 0 0 8px 0;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text-color-light);
+      max-height: 100px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .card small {
+      color: var(--accent-color);
+      font-weight: 500;
     }
 
     .card-clicked {
-      background: #e8f5e9; /* Soft green */
-      border-left: 4px solid #28a745;
-      box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
+      border-left: 4px solid var(--success-color);
+      background-color: #f6fff8;
     }
 
     .card-clicked h3 {
-      color: #28a745;
+      color: var(--success-color);
+    }
+    
+    .empty-state {
+      grid-column: 1 / -1; /* Span all columns */
+      text-align: center;
+      padding: 40px;
+      background-color: #fdfdff;
+      border: 2px dashed var(--border-color);
+      border-radius: 8px;
+      color: var(--text-color-light);
     }
 
-    #fileInput {
-      margin-bottom: 20px;
+    /* Monitor Panel */
+    .monitor-area h4 {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-color-light);
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 8px;
+      margin-bottom: 12px;
     }
 
-    .empty {
-      color: #aaa;
-      font-style: italic;
-    }
-
-    pre {
-      background: #f4f4f4;
-      padding: 10px;
-      border-radius: 4px;
+    .monitor-area pre {
+      background: #eef2f7;
+      padding: 15px;
+      border-radius: 8px;
       overflow: auto;
       white-space: pre-wrap;
       font-size: 13px;
-    }
-
-    /* 🔄 Refresh Icon */
-    .refresh-icon {
-      position: absolute;
-      top: 15px;
-      right: 15px;
-      font-size: 20px;
-      cursor: pointer;
-      background: none;
-      border: none;
-      color: #666;
-      padding: 4px 8px;
-      border-radius: 4px;
-      transition: transform 0.2s, color 0.2s;
-    }
-
-    .refresh-icon:hover {
-      color: #007bff;
-      transform: rotate(15deg);
-    }
-
-    /* Clear Button */
-    #clearSaved {
-      margin-top: 10px;
-      padding: 6px 12px;
-      font-size: 12px;
-      background: #dc3545;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    #clearSaved:hover {
-      background: #c82333;
+      line-height: 1.6;
+      min-height: 100px;
+      border: 1px solid #dbe2ea;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="left-panel">
-      <h2>📤 Upload .txt</h2>
+    <div class="left-panel panel">
+      <div class="panel-header">
+        <h2>Card Processor</h2>
+        <p>Upload a .txt file to generate clickable cards.</p>
+      </div>
+      <div class="controls">
+        <label for="fileInput" class="btn btn-primary">📤 Upload File</label>
+        <button id="clearSaved" class="btn btn-danger">🗑️ Clear Clicked Cards</button>
+      </div>
       <input type="file" id="fileInput" accept=".txt">
-      <button id="clearSaved">🧹 Clear Clicked Cards</button>
-      <div id="grid" class="grid">
-        <div class="card">
-          <p class="empty">No data. Upload a file.</p>
+
+      <div id="grid" class="card-grid">
+        <div class="empty-state">
+          <p>Upload a .txt file to get started.</p>
         </div>
       </div>
     </div>
-    <div class="right-panel">
-      <h3>📊 Monitor</h3>
-      <div id="refreshButton" class="refresh-icon" title="Refresh Tab State">🔄</div>
-      <h4>Open</h4><pre id="openTabs">Loading...</pre>
-      <h4>Closed</h4><pre id="closedTabs">Loading...</pre>
-      <h4>Created</h4><pre id="createdTabs">Loading...</pre>
+    
+    <div class="right-panel panel">
+      <div class="panel-header">
+        <h2>📊 AI Studio Monitor</h2>
+        <p>Real-time list of created tabs.</p>
+      </div>
+      <div class="monitor-area">
+        <h4>Created Tabs</h4>
+        <pre id="createdTabs">Loading...</pre>
+      </div>
     </div>
   </div>
+
   <script src="processor.js"></script>
   <script src="monitor.js"></script>
 </body>

@@ -1,22 +1,20 @@
+// FILE: selectedsend3/background.js
+
+// --- REVISED: Simplified State ---
+// We only need to track created tabs and which UI tabs are open.
 const tabState = {
-  openTabIds: new Set(),
-  closedTabs: [],
   createdTabs: []
 };
-
-// Track open processor.html tabs
-const processorTabs = new Set();
+const processorTabs = new Set(); // Tracks open processor.html tabs
 
 function isAllowedUrl(url) {
   return url?.startsWith("https://aistudio.google.com/");
 }
 
 // --- REVISED: More efficient state notification ---
-// Directly uses the tabState object instead of messaging itself.
+// Sends only the 'createdTabs' state.
 function notifyProcessorTabs() {
   const currentState = {
-    openTabIds: [...tabState.openTabIds],
-    closedTabs: [...tabState.closedTabs],
     createdTabs: [...tabState.createdTabs]
   };
 
@@ -26,29 +24,22 @@ function notifyProcessorTabs() {
       payload: currentState
     }).catch((error) => {
       console.warn(`Could not send message to tab ${tabId}, removing. Error: ${error.message}`);
-      processorTabs.delete(tabId);
+      processorTabs.delete(tabId); // Clean up if a tab is closed/unreachable
     });
   }
 }
 
-// --- INITIALIZATION ---
-// Get initial state of tabs when the extension starts
-chrome.tabs.query({}, tabs => {
-  tabs.forEach(tab => {
-    if (isAllowedUrl(tab.url)) {
-      tabState.openTabIds.add(tab.id);
-    }
-    if (tab.url?.includes('processor.html')) {
-      processorTabs.add(tab.id);
-    }
-  });
+// --- INITIALIZATION (Simplified) ---
+// Find any processor.html tabs that are already open on startup.
+chrome.tabs.query({ url: `*://*/processor.html` }, tabs => {
+  tabs.forEach(tab => processorTabs.add(tab.id));
 });
 
-// --- EVENT LISTENERS ---
+// --- EVENT LISTENERS (Simplified) ---
 
+// Track newly created AI Studio tabs
 chrome.tabs.onCreated.addListener(tab => {
   if (isAllowedUrl(tab.url)) {
-    tabState.openTabIds.add(tab.id);
     tabState.createdTabs.push({
       id: tab.id,
       url: tab.url,
@@ -59,16 +50,17 @@ chrome.tabs.onCreated.addListener(tab => {
   }
 });
 
+// Track when a user navigates an existing tab to AI Studio
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   // Logic to track when our processor.html UI tab is open
   if (changeInfo.status === 'complete' && tab.url?.includes('processor.html')) {
     processorTabs.add(tabId);
+    return; // No further action needed for this tab
   }
 
-  // --- REVISED: Fixed bug to get complete tab info ---
-  // Added the 'tab' parameter to get the title and full URL.
-  if (changeInfo.url && isAllowedUrl(tab.url) && !tabState.openTabIds.has(tabId)) {
-    tabState.openTabIds.add(tabId);
+  // Check if an existing tab navigated to our target URL
+  const isAlreadyTracked = tabState.createdTabs.some(t => t.id === tabId);
+  if (changeInfo.url && isAllowedUrl(tab.url) && !isAlreadyTracked) {
     tabState.createdTabs.push({
       id: tabId,
       url: tab.url,
@@ -79,27 +71,17 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
+// Stop tracking closed processor.html tabs
 chrome.tabs.onRemoved.addListener(tabId => {
-  // Stop tracking closed processor tabs
   if (processorTabs.has(tabId)) {
     processorTabs.delete(tabId);
   }
-
-  // Update state for closed aistudio tabs
-  if (tabState.openTabIds.has(tabId)) {
-    tabState.openTabIds.delete(tabId);
-    tabState.closedTabs.push({ id: tabId, timestamp: Date.now() });
-    notifyProcessorTabs();
-  }
 });
 
-// --- MESSAGE HANDLING ---
-// Listens for requests from the monitor UI (e.g., on initial load)
+// --- MESSAGE HANDLING (Simplified) ---
 chrome.runtime.onMessage.addListener((req, _, sendResponse) => {
   if (req.action === "getTabState") {
     sendResponse({
-      openTabIds: [...tabState.openTabIds],
-      closedTabs: [...tabState.closedTabs],
       createdTabs: [...tabState.createdTabs]
     });
   }

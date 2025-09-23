@@ -1,25 +1,28 @@
-function render(s) {
-  document.getElementById('openTabs').textContent = JSON.stringify(s.openTabIds, null, 2);
-  document.getElementById('closedTabs').textContent = JSON.stringify(s.closedTabs, null, 2);
-  document.getElementById('createdTabs').textContent = JSON.stringify(s.createdTabs, null, 2);
+// FILE: selectedsend3/monitor.js
+
+// --- REVISED: Simplified render function ---
+function render(state) {
+  // Only update the 'createdTabs' element
+  document.getElementById('createdTabs').textContent = JSON.stringify(state.createdTabs, null, 2);
 }
 
-function fetch() {
-  chrome.runtime.sendMessage({ action: "getTabState" }, r => {
-    if (chrome.runtime.lastError) return;
-    render(r);
+function fetchInitialState() {
+  chrome.runtime.sendMessage({ action: "getTabState" }, response => {
+    // Handle potential errors, e.g., if the background script is not ready
+    if (chrome.runtime.lastError) {
+      console.warn("Could not fetch initial state:", chrome.runtime.lastError.message);
+      return;
+    }
+    render(response);
   });
 }
 
-// Listen for real-time updates from background
+// Listen for real-time updates from the background script
 chrome.runtime.onMessage.addListener((message) => {
   if (message.action === "updateTabState") {
     render(message.payload);
   }
 });
 
-// Manual refresh via icon
-document.getElementById('refreshButton').addEventListener('click', fetch);
-
-// Initial load
-fetch();
+// Fetch the state when the page first loads
+fetchInitialState();

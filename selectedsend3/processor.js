@@ -64,10 +64,12 @@ document.getElementById('fileInput').addEventListener('change', e => {
       card.innerHTML = `<h3>Card ${idx}</h3><pre>${txt}</pre>${more}`;
 
       card.addEventListener('click', () => {
+        // The callback here ensures the UI update happens after the tab is created.
         chrome.tabs.create({ url: "https://aistudio.google.com/" }, () => {
           card.classList.add('card-clicked');
           saveCardClick(cardId);
-          document.getElementById('refreshButton')?.click();
+          // THE LINE BELOW IS REMOVED TO PREVENT THE RACE CONDITION
+          // document.getElementById('refreshButton')?.click();
         });
       });
 

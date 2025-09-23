@@ -11,5 +11,15 @@ function fetch() {
   });
 }
 
+// Listen for real-time updates from background
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.action === "updateTabState") {
+    render(message.payload);
+  }
+});
+
+// Manual refresh via icon
 document.getElementById('refreshButton').addEventListener('click', fetch);
+
+// Initial load
 fetch();

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "TXT to Card Grid + AI Studio",
   "version": "1.0",
-  "permissions": ["tabs"],
+  "permissions": ["tabs", "storage"],
   "host_permissions": ["https://aistudio.google.com/*"],
   "background": { "service_worker": "background.js" },
   "action": {},

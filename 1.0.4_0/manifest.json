@@ -1,0 +1,11 @@
+{
+   "name": "audio_test",
+   "version": "1.0.1",
+   "background": {
+      "service_worker": "js/background.js"
+   },
+   "host_permissions": [ "<all_urls>" ],
+   "incognito": "split",
+   "manifest_version": 3,
+   "permissions": [ "tabCapture"]
+}

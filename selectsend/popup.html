@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { 
+      width: 180px; 
+      text-align: center; 
+      padding: 15px 10px; 
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+    }
+    p { margin: 8px 0; }
+    button {
+      background: #e74c3c;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #c0392b;
+    }
+    .status {
+      font-size: 10px;
+      color: #666;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <p><strong>🎵 Audio Capture</strong></p>
+  <p id="tabInfo">Tab: Loading...</p>
+  <button id="stopBtn">Stop Sharing</button>
+  <div class="status" id="status">Initializing...</div>
+  
+  <!-- This is required to keep the stream active -->
+  <audio id="audioPlayer" muted autoplay hidden></audio>
+
+  <script src="popup.js"></script>
+</body>
+</html>

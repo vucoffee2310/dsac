@@ -1,6 +1,4 @@
-// FILE: selectedsend3/monitor.js
-import { renderMonitor } from './lib/monitorRenderer.js';
-import { downloadJSON } from './lib/utils.js';
+import { renderMonitor, downloadJSON } from './lib/utils.js';
 
 let currentTabState = { createdTabs: [], playingTabs: [] };
 const container = document.getElementById('createdTabs');

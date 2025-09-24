@@ -1,4 +1,3 @@
-// FILE: selectedsend3/lib/audio_injector.js
 (() => {
   if (window.__AUDIO_INJECTOR_LOADED__) return;
   window.__AUDIO_INJECTOR_LOADED__ = true;

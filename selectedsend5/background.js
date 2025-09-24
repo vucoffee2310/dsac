@@ -1,5 +1,4 @@
-// FILE: selectedsend3/background.js
-import { stateManager } from './lib/tabStateManager.js';
+import { stateManager } from './lib/state.js';
 import { automationScript } from './lib/automation.js';
 
 chrome.runtime.onConnect.addListener(port => {

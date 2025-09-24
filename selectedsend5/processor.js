@@ -1,7 +1,5 @@
-// FILE: selectedsend3/processor.js
-import { addClickedCard, clearClickedCards } from './lib/storage.js';
-import { renderCards } from './lib/cardRenderer.js';
-import { handleFileSelect } from './lib/fileHandler.js';
+import { addClickedCard, clearClickedCards } from './lib/state.js';
+import { renderCards, handleFileSelect } from './lib/utils.js';
 
 const grid = document.getElementById('grid');
 

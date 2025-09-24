@@ -1,5 +1,3 @@
-// FILE: selectedsend3/lib/automation.js
-
 export function automationScript(promptText) {
     'use strict';
     const wait = (ms = 500) => new Promise(resolve => setTimeout(resolve, ms));

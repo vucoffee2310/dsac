@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TXT Processor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="processor.css">
+</head>
+<body>
+  <div class="container">
+    <div class="panel left-panel">
+      <header class="panel-header">
+        <h2>TXT to Card Grid</h2>
+        <p>Upload a .txt file. The content will be split into cards. Click a card to send its content to a new AI Studio tab.</p>
+      </header>
+      <div class="controls">
+        <label for="fileInput" class="btn btn-primary">📂 Select .txt File</label>
+        <input type="file" id="fileInput" accept=".txt">
+        <button id="clearSaved" class="btn btn-danger">🗑️ Clear Clicked State</button>
+      </div>
+      <div class="card-grid" id="grid">
+        <div class="placeholder">
+          <p>Please select a .txt file to begin.</p>
+        </div>
+      </div>
+    </div>
+    <div class="panel right-panel">
+      <header class="panel-header">
+        <div class="monitor-header-main">
+            <h2>Tab Monitor</h2>
+            <button id="playAllTabs" class="btn btn-secondary" disabled>▶️ Play All Monitored</button>
+        </div>
+        <p>Tracks tabs created from cards and displays the AI's response.</p>
+      </header>
+      <div id="createdTabs">
+        <div class="placeholder">
+          <p>Click a card to monitor its tab.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="processor.js"></script>
+  <script type="module" src="monitor.js"></script>
+</body>
+</html>

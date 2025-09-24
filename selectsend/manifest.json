@@ -6,7 +6,12 @@
   "background": {
     "service_worker": "background.js"
   },
-  "permissions": ["tabs", "scripting", "tabCapture"],
+  "permissions": [
+    "tabs", 
+    "scripting", 
+    "tabCapture",
+    "activeTab"
+  ],
   "host_permissions": [
     "https://aistudio.google.com/*",
     "<all_urls>"

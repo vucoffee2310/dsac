@@ -13,18 +13,21 @@ function sendToReader(tabId, text) {
 
 // Function to start audio capture for a tab
 function startAudioCapture(tabId, tabTitle) {
-  chrome.windows.create({
-    type: "popup",
-    url: chrome.runtime.getURL(`popup.html?tabId=${tabId}&title=${encodeURIComponent(tabTitle)}`),
-    focused: false, // Don't steal focus from the AI Studio tab
-    width: 200,
-    height: 150
-  }).then(window => {
-    audioPopups[tabId] = window.id;
-    console.log(`✅ Audio capture started for tab ${tabId}`);
-  }).catch(err => {
-    console.error(`❌ Failed to start audio capture for tab ${tabId}:`, err);
-  });
+  // Wait a bit more before starting audio capture
+  setTimeout(() => {
+    chrome.windows.create({
+      type: "popup",
+      url: chrome.runtime.getURL(`popup.html?tabId=${tabId}&title=${encodeURIComponent(tabTitle)}`),
+      focused: false, // Don't steal focus from the AI Studio tab
+      width: 200,
+      height: 150
+    }).then(window => {
+      audioPopups[tabId] = window.id;
+      console.log(`✅ Audio capture popup created for tab ${tabId}`);
+    }).catch(err => {
+      console.error(`❌ Failed to start audio capture for tab ${tabId}:`, err);
+    });
+  }, 2000); // Wait 2 seconds for tab to be ready
 }
 
 // Listen for messages from:
@@ -88,12 +91,13 @@ chrome.action.onClicked.addListener(async () => {
   // ✅ STEP 2: OPEN AI STUDIO CHAT PAGE
   const tab = await chrome.tabs.create({ url: "https://aistudio.google.com/prompts/new_chat" });
 
-  // Wait for page to fully load
+  // Wait for page to fully load and become interactive
   const waitForLoad = new Promise(resolve => {
     const listener = (tabId, changeInfo) => {
       if (tabId === tab.id && changeInfo.status === 'complete') {
         chrome.tabs.onUpdated.removeListener(listener);
-        resolve();
+        // Additional wait for page to be fully interactive
+        setTimeout(resolve, 1000);
       }
     };
     chrome.tabs.onUpdated.addListener(listener);
@@ -101,10 +105,7 @@ chrome.action.onClicked.addListener(async () => {
 
   await waitForLoad;
 
-  // ✅ STEP 3: START AUDIO CAPTURE AFTER PAGE IS LOADED
-  startAudioCapture(tab.id, tab.title || "AI Studio Chat");
-
-  // ✅ STEP 4: INJECT AUTOMATION SCRIPT
+  // ✅ STEP 3: INJECT AUTOMATION SCRIPT FIRST
   try {
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
@@ -250,5 +251,8 @@ chrome.action.onClicked.addListener(async () => {
     console.error("❌ Failed to inject automation script:", err);
     sendToReader(tab.id, `[INJECTION ERROR] ${err.message}`);
   }
+
+  // ✅ STEP 4: START AUDIO CAPTURE AFTER EVERYTHING IS READY
+  startAudioCapture(tab.id, tab.title || "AI Studio Chat");
 
 });

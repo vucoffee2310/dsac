@@ -27,4 +27,3 @@ list.onclick = e => {
 
 playAllBtn.onclick = () => chrome.runtime.sendMessage({ playAll: true });
 port.onMessage.addListener(renderTabs);
-window.addEventListener('beforeunload', () => port.disconnect());

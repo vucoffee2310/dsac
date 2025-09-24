@@ -18,19 +18,13 @@ chrome.runtime.onMessage.addListener((req, sender) => {
   } else if (req.playTab) {
     playingTabs.clear();
     playingTabs.add(req.playTab);
-    chrome.tabs.sendMessage(req.playTab, { play: true }).catch(() => {
-      injectedTabs.delete(req.playTab);
-      playingTabs.delete(req.playTab);
-    });
+    chrome.tabs.sendMessage(req.playTab, { play: true });
     notifyPopups();
   } else if (req.playAll) {
     playingTabs.clear();
     injectedTabs.forEach(id => {
       playingTabs.add(id);
-      chrome.tabs.sendMessage(id, { play: true }).catch(() => {
-        injectedTabs.delete(id);
-        playingTabs.delete(id);
-      });
+      chrome.tabs.sendMessage(id, { play: true });
     });
     notifyPopups();
   }
@@ -42,7 +36,6 @@ chrome.tabs.onRemoved.addListener(tabId => {
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (changeInfo.status === 'loading' && playingTabs.delete(tabId)) {
-    chrome.tabs.sendMessage(tabId, { stop: true }).catch(() => {});
     notifyPopups();
   }
 });

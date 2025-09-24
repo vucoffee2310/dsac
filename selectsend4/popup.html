@@ -10,11 +10,6 @@
       margin: 0;
       font-size: 14px;
     }
-    .controls {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 10px;
-    }
     button {
       padding: 4px 8px;
       font-size: 12px;
@@ -22,10 +17,9 @@
       border-radius: 3px;
       background: #f8f8f8;
       cursor: pointer;
+      margin-bottom: 10px;
     }
-    button:hover {
-      background: #e9e9e9;
-    }
+    button:hover { background: #e9e9e9; }
     .tab {
       padding: 6px 8px;
       cursor: pointer;
@@ -34,9 +28,7 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .tab:hover {
-      background-color: #f0f0f0;
-    }
+    .tab:hover { background-color: #f0f0f0; }
     .tab.playing {
       background-color: #e6ffe6;
       font-weight: bold;
@@ -49,9 +41,7 @@
   </style>
 </head>
 <body>
-  <div class="controls">
-    <button id="play-all">▶️ Play All</button>
-  </div>
+  <button id="play-all">▶️ Play All</button>
   <div id="list">
     <div class="empty">Listening for tabs...</div>
   </div>

@@ -1,14 +1,21 @@
+// background.js
+
 const injectedTabs = new Set();
 const playingTabs = new Set();
-const popupConnections = new Set();
+const popupConnections = new Set(); // Also used for monitor connections
 
 const notifyPopups = () => {
   const update = { tabIds: [...injectedTabs], playingTabs: [...playingTabs] };
   popupConnections.forEach(port => {
-    try { port.postMessage(update); } catch { popupConnections.delete(port); }
+    try {
+      port.postMessage(update);
+    } catch {
+      popupConnections.delete(port);
+    }
   });
 };
 
+// Handle messages from content scripts or monitor page
 chrome.runtime.onMessage.addListener((req, sender) => {
   const tabId = sender.tab?.id;
   
@@ -30,8 +37,11 @@ chrome.runtime.onMessage.addListener((req, sender) => {
   }
 });
 
+// Clean up when tabs are closed or reloaded
 chrome.tabs.onRemoved.addListener(tabId => {
-  if (injectedTabs.delete(tabId) | playingTabs.delete(tabId)) notifyPopups();
+  if (injectedTabs.delete(tabId) || playingTabs.delete(tabId)) {
+    notifyPopups();
+  }
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
@@ -40,10 +50,16 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   }
 });
 
+// Handle connection from popup or monitor page
 chrome.runtime.onConnect.addListener(port => {
-  if (port.name === 'popup') {
+  if (port.name === 'popup' || port.name === 'monitor') {
     popupConnections.add(port);
     port.postMessage({ tabIds: [...injectedTabs], playingTabs: [...playingTabs] });
     port.onDisconnect.addListener(() => popupConnections.delete(port));
   }
+});
+
+// Open monitor.html when extension icon is clicked
+chrome.action.onClicked.addListener(() => {
+  chrome.tabs.create({ url: chrome.runtime.getURL('monitor.html') });
 });

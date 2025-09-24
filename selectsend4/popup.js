@@ -1,13 +1,10 @@
-// popup.js
 const list = document.getElementById('list');
 const playAllBtn = document.getElementById('play-all');
-
 const port = chrome.runtime.connect({ name: 'popup' });
 
-const renderTabs = (data) => {
-  const { tabIds = [], playingTabs = [] } = data;
-  const playingSet = new Set(playingTabs); // for fast lookup
-
+const renderTabs = ({ tabIds = [], playingTabs = [] }) => {
+  const playing = new Set(playingTabs);
+  
   if (!tabIds.length) {
     list.innerHTML = '<div class="empty">No audio tabs</div>';
     playAllBtn.disabled = true;
@@ -15,38 +12,19 @@ const renderTabs = (data) => {
   }
 
   playAllBtn.disabled = false;
-
   Promise.all(tabIds.map(id => chrome.tabs.get(id).catch(() => null)))
     .then(tabs => {
-      list.innerHTML = '';
-      tabs
-        .filter(tab => tab)
-        .forEach(tab => {
-          const el = document.createElement('div');
-          el.className = 'tab';
-          el.textContent = tab.title || 'Untitled';
-          el.title = tab.url;
-
-          // ✅ Highlight if in playingTabs
-          if (playingSet.has(tab.id)) {
-            el.classList.add('playing');
-          }
-
-          el.onclick = () => {
-            chrome.runtime.sendMessage({ playTab: tab.id });
-            // No local highlight — background will push update
-          };
-
-          list.appendChild(el);
-        });
+      list.innerHTML = tabs.filter(Boolean).map(tab => 
+        `<div class="tab${playing.has(tab.id) ? ' playing' : ''}" 
+             data-id="${tab.id}" title="${tab.url}">${tab.title || 'Untitled'}</div>`
+      ).join('');
     });
 };
 
-playAllBtn.onclick = () => {
-  chrome.runtime.sendMessage({ playAll: true });
-  // Background will push updated playingTabs instantly
+list.onclick = e => {
+  if (e.target.dataset.id) chrome.runtime.sendMessage({ playTab: +e.target.dataset.id });
 };
 
+playAllBtn.onclick = () => chrome.runtime.sendMessage({ playAll: true });
 port.onMessage.addListener(renderTabs);
-
 window.addEventListener('beforeunload', () => port.disconnect());

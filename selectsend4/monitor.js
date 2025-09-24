@@ -1,43 +1,22 @@
-const list = document.getElementById('list');
-const playAllBtn = document.getElementById('play-all');
+const l = document.getElementById('l');
+const b = document.getElementById('b');
+const port = chrome.runtime.connect();
 
-// Connect to background
-const port = chrome.runtime.connect({ name: 'monitor' });
-
-const renderTabs = ({ tabIds = [], playingTabs = [] }) => {
-  const playing = new Set(playingTabs);
-
-  if (!tabIds.length) {
-    list.innerHTML = '<div class="empty">No audio tabs</div>';
-    playAllBtn.disabled = true;
+port.onMessage.addListener(async ({ tabs = [], playing = [] }) => {
+  const p = new Set(playing);
+  if (!tabs.length) {
+    l.innerHTML = '<div class="e">No audio tabs</div>';
+    b.disabled = 1;
     return;
   }
-
-  playAllBtn.disabled = false;
-  Promise.all(tabIds.map(id => chrome.tabs.get(id).catch(() => null)))
-    .then(tabs => {
-      const validTabs = tabs.filter(Boolean);
-      if (validTabs.length === 0) {
-        list.innerHTML = '<div class="empty">No active audio tabs</div>';
-        playAllBtn.disabled = true;
-        return;
-      }
-
-      list.innerHTML = validTabs.map(tab =>
-        `<div class="tab${playing.has(tab.id) ? ' playing' : ''}"
-             data-id="${tab.id}" title="${tab.url}">${tab.title || 'Untitled'}</div>`
-      ).join('');
-    });
-};
-
-list.addEventListener('click', (e) => {
-  if (e.target.dataset.id) {
-    chrome.runtime.sendMessage({ playTab: +e.target.dataset.id });
-  }
+  b.disabled = 0;
+  const t = await Promise.all(tabs.map(id => chrome.tabs.get(id).catch(() => 0)));
+  const v = t.filter(Boolean);
+  l.innerHTML = v.length ? v.map(t =>
+    `<div class="t${p.has(t.id) ? ' p' : ''}" data-id="${t.id}">${t.title || 'Untitled'}</div>`
+  ).join('') : '<div class="e">No active tabs</div>';
+  b.disabled = !v.length;
 });
 
-playAllBtn.addEventListener('click', () => {
-  chrome.runtime.sendMessage({ playAll: true });
-});
-
-port.onMessage.addListener(renderTabs);
+l.onclick = e => e.target.dataset.id && chrome.runtime.sendMessage({ playTab: +e.target.dataset.id });
+b.onclick = () => chrome.runtime.sendMessage({ playAll: 1 });

@@ -16,15 +16,21 @@ function setupKeepAlive() {
   console.log("Keep-alive port connected.");
 }
 
+const getTabData = tabInfo => ({
+    card_name: tabInfo.cardName,
+    prompt_content: tabInfo.cardContent || '',
+    ai_response: tabInfo.responseText || null,
+    response_timestamp: tabInfo.responseTimestamp || null
+});
+
 function render(state) {
   currentTabState = state;
-  if (container && playAllBtn && downloadAllBtn && clearAllBtn && monitorProgress) {
+  if (container) {
     renderMonitor(state, container, playAllBtn, downloadAllBtn, clearAllBtn, monitorProgress);
   }
 }
 
-function handleMonitorClick(event) {
-  const target = event.target;
+function handleMonitorClick({ target }) {
   const entryDiv = target.closest('.monitor-entry');
   if (!entryDiv) return;
 
@@ -32,37 +38,20 @@ function handleMonitorClick(event) {
 
   if (target.closest('.btn-play')) {
     chrome.runtime.sendMessage({ action: "playTab", tabId });
-    return;
-  }
-
-  if (target.closest('.btn-download')) {
+  } else if (target.closest('.btn-download')) {
     const tabInfo = currentTabState.createdTabs.find(t => t.id === tabId);
     if (!tabInfo) return;
-    const data = {
-        card_name: tabInfo.cardName,
-        prompt_content: tabInfo.cardContent || '',
-        ai_response: tabInfo.responseText || null,
-        response_timestamp: tabInfo.responseTimestamp || null
-    };
     const filename = `${(tabInfo.cardName || 'card').replace(/[\s\W]+/g, '_')}_data.json`;
-    downloadJSON(data, filename);
+    downloadJSON(getTabData(tabInfo), filename);
   }
 }
 
 function handleDownloadAll() {
-  if (!currentTabState.createdTabs || currentTabState.createdTabs.length === 0) {
-    alert("No data to download.");
-    return;
-  }
-  const allData = currentTabState.createdTabs.map(tabInfo => ({
-    card_name: tabInfo.cardName,
-    prompt_content: tabInfo.cardContent || '',
-    ai_response: tabInfo.responseText || null,
-    response_timestamp: tabInfo.responseTimestamp || null
-  }));
-
+  const { createdTabs } = currentTabState;
+  if (!createdTabs?.length) return alert("No data to download.");
+  
   const filename = `all_cards_data_${new Date().toISOString().slice(0, 10)}.json`;
-  downloadJSON(allData, filename);
+  downloadJSON(createdTabs.map(getTabData), filename);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -72,18 +61,11 @@ document.addEventListener('DOMContentLoaded', () => {
   chrome.runtime.onMessage.addListener(msg => msg.action === "updateTabState" && render(msg.payload));
   
   container.addEventListener('click', handleMonitorClick);
-  
-  playAllBtn.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ action: "playAllTabs" });
-  });
-
+  playAllBtn.addEventListener('click', () => chrome.runtime.sendMessage({ action: "playAllTabs" }));
   downloadAllBtn.addEventListener('click', handleDownloadAll);
-  
   clearAllBtn.addEventListener('click', () => {
-    if (currentTabState.createdTabs.length > 0) {
-      if (confirm('Are you sure you want to close all monitored tabs and clear the list?')) {
-        chrome.runtime.sendMessage({ action: "clearAllTabs" });
-      }
+    if (currentTabState.createdTabs.length && confirm('Are you sure you want to close all monitored tabs and clear the list?')) {
+      chrome.runtime.sendMessage({ action: "clearAllTabs" });
     }
   });
 });

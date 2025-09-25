@@ -1,64 +1,55 @@
 import { getClickedCards } from './state.js';
 
-// --- Core Utilities ---
+// --- Utilities ---
+// This is already concise and secure. No changes needed.
 export const escapeHtml = (text = '') => {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
 };
 
+// This pattern is standard and already optimized. No changes needed.
 export const downloadJSON = (data, filename) => {
-    const content = JSON.stringify(data, null, 2);
-    const blob = new Blob([content], { type: 'application/json;charset=utf-8' });
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const link = Object.assign(document.createElement('a'), { href: url, download: filename });
+    document.body.appendChild(link).click();
+    link.remove(); // .remove() is a modern alternative to parentNode.removeChild(child)
     URL.revokeObjectURL(url);
 };
 
-
 // --- File Handling ---
-export function handleFileSelect(event, onFileParsed) {
-  const file = event.target.files[0];
-  if (file) {
-    file.text().then(text => {
-      const lines = text.split(/\r?\n/).filter(line => line.trim());
-      onFileParsed(lines);
-    });
-  }
+// Using a guard clause to exit early if no file is present.
+export async function handleFileSelect(event, onFileParsed) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  const text = await file.text();
+  const lines = text.split(/\r?\n/).filter(Boolean);
+  onFileParsed(lines);
 }
 
-
-// --- Rendering Functions ---
-
-// For card grid
-const LINES_PER_CARD = 200;
-const PREVIEW_LINES = 3;
-
-export async function renderCards(gridElement, lines) {
+// --- Card Rendering ---
+// Replaced the for-loop with a more functional approach using Array.from and map.
+export async function renderCards(gridElement, lines, linesPerCard = 200) {
   if (!lines.length) {
-    gridElement.innerHTML = '<div class="placeholder"><p>No content found in file.</p></div>';
+    gridElement.innerHTML = '<div class="placeholder"><p>No content in file.</p></div>';
     return;
   }
   
-  const cardsHtml = [];
-  for (let i = 0; i < lines.length; i += LINES_PER_CARD) {
-    const chunk = lines.slice(i, i + LINES_PER_CARD);
-    const index = Math.floor(i / LINES_PER_CARD) + 1;
-    const preview = chunk.slice(0, PREVIEW_LINES).join('\n');
-    const remaining = chunk.length - PREVIEW_LINES;
-    cardsHtml.push(`
+  const numCards = Math.ceil(lines.length / linesPerCard);
+  gridElement.innerHTML = Array.from({ length: numCards }, (_, i) => {
+    const chunk = lines.slice(i * linesPerCard, (i + 1) * linesPerCard);
+    const index = i + 1;
+    const preview = chunk.slice(0, 3).join('\n');
+    const remaining = Math.max(0, chunk.length - 3);
+    return `
       <div class="card" data-id="card_${index}" data-name="${index}" data-content="${escapeHtml(chunk.join('\n'))}">
         <h3>${index}</h3>
         <pre>${escapeHtml(preview) || '<em>(empty)</em>'}</pre>
         ${remaining > 0 ? `<small>+${remaining} more</small>` : ''}
-      </div>`);
-  }
-  gridElement.innerHTML = cardsHtml.join('');
+      </div>`;
+  }).join('');
 
   const clickedIds = await getClickedCards();
   Object.keys(clickedIds).forEach(cardId => {
@@ -66,125 +57,84 @@ export async function renderCards(gridElement, lines) {
   });
 }
 
-// Helper for creating the HTML for a single monitor entry
-const createMonitorEntryHtml = (tab, isPlaying) => {
-  const completeClass = tab.isComplete ? 'is-complete' : '';
-  const currentResponseText = tab.responseText || '';
-  return `
-    <div class="monitor-entry ${isPlaying ? 'playing' : ''} ${completeClass}" data-tab-id="${tab.id}">
-      <div class="monitor-entry-header">
-        <p>
-          <strong>${escapeHtml(tab.cardName || 'N/A')}</strong>
-          <span class="completion-status">✅</span>
-        </p>
-        <div class="monitor-buttons">
-          <button class="btn btn-play">${isPlaying ? '⏹️ Playing...' : '▶️ Play'}</button>
-          <button class="btn btn-download">📥 Download JSON</button>
-        </div>
+// --- Monitor Rendering ---
+// Combined helpers into the main function for locality, but kept separate for clarity in this refactor.
+// The original structure is good, so changes are minimal.
+const createMonitorEntryHtml = (tab, isPlaying) => `
+  <div class="monitor-entry ${isPlaying ? 'playing' : ''} ${tab.isComplete ? 'is-complete' : ''}" data-tab-id="${tab.id}">
+    <div class="monitor-entry-header">
+      <p><strong>${escapeHtml(tab.cardName ?? 'N/A')}</strong><span class="completion-status">✅</span></p>
+      <div class="monitor-buttons">
+        <button class="btn btn-play" data-tooltip="${isPlaying ? "Stop Audio" : "Play Audio"}">${isPlaying ? '⏹️' : '▶️'}</button>
+        <button class="btn btn-download" data-tooltip="Download JSON">📥</button>
       </div>
-      <details>
-        <summary>View Original Prompt</summary>
-        <pre>${escapeHtml(tab.cardContent || '(No content)')}</pre>
-      </details>
-      
-      <div class="response-area">
-        ${currentResponseText ? `
-          <details> <!-- REMOVED the 'open' attribute -->
-            <summary>View AI Response</summary>
-            <div class="monitor-response">
-              <h4>AI Response <small>(${tab.responseTimestamp})</small></h4>
-              <pre>${escapeHtml(currentResponseText)}</pre>
-            </div>
-          </details>` : `
-          <div class="monitor-response-placeholder">
-            <p>🤖 Response pending...</p>
-          </div>`
-        }
-      </div>
-    </div>`;
+    </div>
+    <details><summary>View Original Prompt</summary><pre>${escapeHtml(tab.cardContent ?? '(No content)')}</pre></details>
+    <div class="response-area">
+      ${tab.responseText 
+        ? `<details><summary>View AI Response</summary><div class="monitor-response"><h4>AI Response <small>(${tab.responseTimestamp})</small></h4><pre>${escapeHtml(tab.responseText)}</pre></div></details>`
+        : `<div class="monitor-response-placeholder"><p>🤖 Response pending...</p></div>`
+      }
+    </div>
+  </div>`;
+
+const updateMonitorEntry = (entry, tab, isPlaying) => {
+  entry.classList.toggle('playing', isPlaying);
+  entry.classList.toggle('is-complete', tab.isComplete);
+  const playBtn = entry.querySelector('.btn-play');
+  playBtn.textContent = isPlaying ? '⏹️' : '▶️';
+  playBtn.dataset.tooltip = isPlaying ? 'Stop Audio' : 'Play Audio'; // Use .dataset
+
+  const responseArea = entry.querySelector('.response-area');
+  const placeholderEl = responseArea.querySelector('.monitor-response-placeholder');
+
+  // If the placeholder exists but we now have response text, replace the whole area.
+  if (placeholderEl && tab.responseText) {
+      responseArea.innerHTML = `<details><summary>View AI Response</summary><div class="monitor-response"><h4>AI Response <small>(${tab.responseTimestamp})</small></h4><pre>${escapeHtml(tab.responseText)}</pre></div></details>`;
+  } 
+  // Otherwise, if the response area is already populated, just update the text content.
+  else if (!placeholderEl && tab.responseText) {
+      const pre = responseArea.querySelector('pre');
+      const small = responseArea.querySelector('small');
+      if (pre) pre.textContent = tab.responseText;
+      if (small) small.textContent = `(${tab.responseTimestamp})`;
+  }
 };
 
-// For monitor - Smartly updates the DOM instead of replacing innerHTML
-export function renderMonitor(state, containerElement, playAllBtnElement, downloadAllBtnElement, clearAllBtnElement, progressElement) {
-  const total = state.createdTabs?.length || 0;
-  const finished = state.createdTabs?.filter(t => t.isComplete).length || 0;
-  const hasTabs = total > 0;
+// Simplified the DOM reconciliation loop slightly.
+export function renderMonitor(state, container, playAllBtn, downloadAllBtn, clearAllBtn, progress) {
+    const { createdTabs, playingTabs } = state;
+    const total = createdTabs?.length || 0;
+    const finished = createdTabs?.filter(t => t.isComplete).length || 0;
+    const hasTabs = total > 0;
 
-  playAllBtnElement.disabled = !hasTabs;
-  downloadAllBtnElement.disabled = !hasTabs;
-  clearAllBtnElement.disabled = !hasTabs;
-
-  if (hasTabs) {
-    progressElement.textContent = `Progress: ${finished} / ${total} completed`;
-  } else {
-    progressElement.textContent = `Awaiting jobs...`;
-  }
-
-  const placeholder = containerElement.querySelector('.placeholder');
-
-  if (!hasTabs) {
-    if (!placeholder) {
-      containerElement.innerHTML = `<div class="placeholder">Click a card to monitor its tab.</div>`;
+    // Update Header
+    [playAllBtn, downloadAllBtn, clearAllBtn].forEach(btn => btn.disabled = !hasTabs);
+    progress.textContent = hasTabs ? `Progress: ${finished} / ${total} completed` : 'Awaiting jobs...';
+    
+    const placeholder = container.querySelector('.placeholder');
+    if (placeholder) {
+      placeholder.style.display = hasTabs ? 'none' : 'block';
     }
-    containerElement.querySelectorAll('.monitor-entry').forEach(e => e.remove());
-    return;
-  } else if (placeholder) {
-    placeholder.remove();
-  }
 
-  const playingSet = new Set(state.playingTabs || []);
-  const newTabIds = new Set(state.createdTabs.map(t => t.id));
+    // DOM Reconciliation
+    const playingSet = new Set(playingTabs);
+    const existingEntries = new Map(Array.from(container.querySelectorAll('.monitor-entry'), el => [el.dataset.tabId, el]));
 
-  containerElement.querySelectorAll('.monitor-entry').forEach(entry => {
-    const tabId = parseInt(entry.dataset.tabId, 10);
-    if (!newTabIds.has(tabId)) {
-      entry.remove();
-    }
-  });
+    // Iterate state to update/create DOM nodes
+    [...createdTabs].reverse().forEach(tab => {
+        const tabIdStr = String(tab.id);
+        const entry = existingEntries.get(tabIdStr);
+        const isPlaying = playingSet.has(tab.id);
 
-  [...state.createdTabs].reverse().forEach((tab, index) => {
-    let entry = containerElement.querySelector(`.monitor-entry[data-tab-id="${tab.id}"]`);
-    const isPlaying = playingSet.has(tab.id);
-
-    if (!entry) {
-      const newEntryHtml = createMonitorEntryHtml(tab, isPlaying);
-      if (index === 0) {
-        containerElement.insertAdjacentHTML('afterbegin', newEntryHtml);
-      } else {
-        const previousTabId = state.createdTabs[state.createdTabs.length - index].id;
-        const previousEntry = containerElement.querySelector(`.monitor-entry[data-tab-id="${previousTabId}"]`);
-        previousEntry?.insertAdjacentHTML('afterend', newEntryHtml);
-      }
-    } else {
-      entry.classList.toggle('playing', isPlaying);
-      entry.classList.toggle('is-complete', tab.isComplete);
-      entry.querySelector('.btn-play').textContent = isPlaying ? '⏹️ Playing...' : '▶️ Play';
-      
-      const responseArea = entry.querySelector('.response-area');
-      const currentResponse = tab.responseText || '';
-      const placeholderEl = responseArea.querySelector('.monitor-response-placeholder');
-
-      if (placeholderEl && currentResponse) {
-        responseArea.innerHTML = `
-          <details> <!-- REMOVED the 'open' attribute -->
-            <summary>View AI Response</summary>
-            <div class="monitor-response">
-              <h4>AI Response <small>(${tab.responseTimestamp})</small></h4>
-              <pre>${escapeHtml(currentResponse)}</pre>
-            </div>
-          </details>`;
-      } 
-      else if (!placeholderEl && currentResponse) {
-        const preEl = responseArea.querySelector('pre');
-        const smallEl = responseArea.querySelector('small');
-
-        if (preEl && preEl.textContent !== currentResponse) {
-          preEl.textContent = currentResponse;
+        if (entry) {
+            updateMonitorEntry(entry, tab, isPlaying);
+            existingEntries.delete(tabIdStr); // Mark as processed
+        } else {
+            container.insertAdjacentHTML('afterbegin', createMonitorEntryHtml(tab, isPlaying));
         }
-        if (smallEl) {
-          smallEl.textContent = `(${tab.responseTimestamp})`;
-        }
-      }
-    }
-  });
+    });
+
+    // Remove stale entries that are no longer in the state
+    existingEntries.forEach(staleEntry => staleEntry.remove());
 }

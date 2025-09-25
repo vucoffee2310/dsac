@@ -15,23 +15,20 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
         stateManager.stopPlayingOnLoad(tabId);
     }
     if (changeInfo.status !== 'complete' || !tab.url) return;
-
-    if (tab.url.includes(chrome.runtime.getURL("processor.html"))) {
-        stateManager.addProcessorTab(tabId);
-    } else if (tab.url.startsWith('https://aistudio.google.com/prompts/new_chat')) {
+    
+    if (tab.url.startsWith('https://aistudio.google.com/prompts/new_chat')) {
         const tabToProcess = stateManager.findInjectableTab(tabId);
         if (tabToProcess) {
             chrome.scripting.executeScript({
                 target: { tabId },
                 func: automationScript,
-                args: [tabToProcess.cardContent]
+                args: [tabToProcess.cardContent, tabToProcess.cardName]
             }).catch(err => console.error(`Script injection failed for tab ${tabId}:`, err));
         }
     }
 });
 
 chrome.tabs.onRemoved.addListener(tabId => {
-    stateManager.removeProcessorTab(tabId);
     stateManager.removeTab(tabId);
 });
 
@@ -57,6 +54,10 @@ chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
         
         case "playAllTabs":
             stateManager.playAllTabs();
+            break;
+
+        case "clearAllTabs":
+            stateManager.clearAllTabs();
             break;
     }
 });

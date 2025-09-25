@@ -1,4 +1,4 @@
-// --- Storage Functions (from storage.js) ---
+// --- Storage Functions (for clicked card state) ---
 const STORAGE_KEY = 'clickedCards_v1';
 
 export async function getClickedCards() {
@@ -17,60 +17,51 @@ export async function clearClickedCards() {
 }
 
 
-// --- Tab State Management (from tabStateManager.js) ---
+// --- Tab State Management ---
 let createdTabs = [];
-const processorTabs = new Set();
 const playingTabs = new Set();
 
-function safeSendMessage(tabId, message, onError) {
-  chrome.tabs.sendMessage(tabId, message).catch(error => {
-    if (error.message.includes('Receiving end does not exist')) {
-      if (onError) onError(tabId);
-    } else {
-      console.error(`Error sending message to tab ${tabId}:`, error);
-    }
-  });
-}
-
-const notifyProcessorTabs = () => {
+const notifyProcessorTabs = async () => {
   const payload = { 
       createdTabs: [...createdTabs], 
       playingTabs: [...playingTabs] 
   };
-  processorTabs.forEach(tabId => {
-    safeSendMessage(tabId, { action: "updateTabState", payload }, (failedTabId) => {
-      processorTabs.delete(failedTabId);
-    });
-  });
+  
+  try {
+    const tabs = await chrome.tabs.query({ url: chrome.runtime.getURL("processor.html") });
+    for (const tab of tabs) {
+      chrome.tabs.sendMessage(tab.id, { action: "updateTabState", payload })
+        .catch(error => console.log(`Could not send message to tab ${tab.id}, it might be closing. Error: ${error.message}`));
+    }
+  } catch (e) {
+      console.error("Failed to query for processor tabs:", e);
+  }
 };
 
 export const stateManager = {
-    addProcessorTab: (tabId) => {
-        processorTabs.add(tabId);
-        notifyProcessorTabs();
-    },
-    removeProcessorTab: (tabId) => processorTabs.delete(tabId),
-    
     addTab: (payload) => {
         if (!createdTabs.some(t => t.id === payload.id)) {
-            createdTabs.push({ ...payload, injected: false });
+            createdTabs.push({ ...payload, injected: false, isComplete: false });
             notifyProcessorTabs();
         }
     },
     removeTab: (tabId) => {
-        const wasPlaying = playingTabs.has(tabId);
-        playingTabs.delete(tabId);
+        const wasChanged = playingTabs.delete(tabId);
         const index = createdTabs.findIndex(t => t.id === tabId);
         if (index > -1) {
             createdTabs.splice(index, 1);
+            if (!wasChanged) notifyProcessorTabs();
         }
-        notifyProcessorTabs();
+        if (wasChanged) notifyProcessorTabs();
     },
-    updateTabResponse: (tabId, { responseText, timestamp }) => {
+    updateTabResponse: (tabId, { responseText, timestamp, isComplete }) => {
         const tab = createdTabs.find(t => t.id === tabId);
         if (tab) {
             tab.responseText = responseText;
             tab.responseTimestamp = timestamp;
+            if (isComplete !== undefined) {
+                tab.isComplete = isComplete;
+            }
             notifyProcessorTabs();
         }
     },
@@ -86,14 +77,14 @@ export const stateManager = {
     playTab: (tabId) => {
         playingTabs.clear();
         playingTabs.add(tabId);
-        safeSendMessage(tabId, { play: true });
+        chrome.tabs.sendMessage(tabId, { play: true }).catch(e => {});
         notifyProcessorTabs();
     },
     playAllTabs: () => {
         playingTabs.clear();
         createdTabs.forEach(tab => {
             playingTabs.add(tab.id);
-            safeSendMessage(tab.id, { play: true });
+            chrome.tabs.sendMessage(tab.id, { play: true }).catch(e => {});
         });
         notifyProcessorTabs();
     },
@@ -104,5 +95,20 @@ export const stateManager = {
         }
     },
 
-    getState: () => ({ createdTabs, playingTabs: [...playingTabs] })
+    getState: () => ({ createdTabs, playingTabs: [...playingTabs] }),
+    
+    clearAllTabs: () => {
+      const tabIds = createdTabs.map(t => t.id);
+      
+      if (tabIds.length > 0) {
+        chrome.tabs.remove(tabIds).catch(e => {
+            console.log("Could not remove all tabs, some may have already been closed.", e.message);
+        });
+      }
+
+      createdTabs = [];
+      playingTabs.clear();
+      
+      notifyProcessorTabs();
+    },
 };

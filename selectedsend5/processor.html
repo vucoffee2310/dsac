@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"> <!-- The data-theme attribute will be set here by JS -->
 <head>
   <meta charset="UTF-8">
-  <title>TXT Processor</title>
+  <!-- MODIFIED TITLE -->
+  <title>Card Processor & Monitor</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -12,13 +13,25 @@
   <div class="container">
     <div class="panel left-panel">
       <header class="panel-header">
-        <h2>TXT to Card Grid</h2>
+        <div class="header-top-row">
+          <!-- MODIFIED HEADER TEXT -->
+          <h2>Card Monitor</h2>
+          <div class="theme-switcher" id="themeSwitcher">
+            <button class="theme-btn" data-theme="light" title="Light Theme">☀️</button>
+            <button class="theme-btn" data-theme="dark" title="Dark Theme">🌙</button>
+            <button class="theme-btn" data-theme="system" title="System Default">🖥️</button>
+          </div>
+        </div>
         <p>Upload a .txt file. The content will be split into cards. Click a card to send its content to a new AI Studio tab.</p>
       </header>
       <div class="controls">
         <label for="fileInput" class="btn btn-primary">📂 Select .txt File</label>
         <input type="file" id="fileInput" accept=".txt">
         <button id="clearSaved" class="btn btn-danger">🗑️ Clear Clicked State</button>
+        <div class="batch-controls">
+          <input type="number" id="batchOpenCount" min="1" placeholder="Qty">
+          <button id="batchOpenBtn" class="btn btn-secondary">🚀 Open Tabs</button>
+        </div>
       </div>
       <div class="card-grid" id="grid">
         <div class="placeholder">
@@ -30,9 +43,13 @@
       <header class="panel-header">
         <div class="monitor-header-main">
             <h2>Tab Monitor</h2>
-            <button id="playAllTabs" class="btn btn-secondary" disabled>▶️ Play All Monitored</button>
+            <div class="monitor-header-buttons">
+              <button id="playAllTabs" class="btn btn-secondary" disabled title="Play All">▶️</button>
+              <button id="downloadAllJson" class="btn btn-secondary" disabled title="Download All">📥</button>
+              <button id="clearAllTabs" class="btn btn-danger" disabled title="Clear All">🗑️</button>
+            </div>
         </div>
-        <p>Tracks tabs created from cards and displays the AI's response.</p>
+        <p id="monitorProgress">Awaiting jobs...</p>
       </header>
       <div id="createdTabs">
         <div class="placeholder">

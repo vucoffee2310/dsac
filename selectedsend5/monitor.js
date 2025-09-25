@@ -3,6 +3,9 @@ import { renderMonitor, downloadJSON } from './lib/utils.js';
 let currentTabState = { createdTabs: [], playingTabs: [] };
 const container = document.getElementById('createdTabs');
 const playAllBtn = document.getElementById('playAllTabs');
+const downloadAllBtn = document.getElementById('downloadAllJson');
+const clearAllBtn = document.getElementById('clearAllTabs');
+const monitorProgress = document.getElementById('monitorProgress');
 
 function setupKeepAlive() {
   let port = chrome.runtime.connect({ name: "keepAlive" });
@@ -15,8 +18,8 @@ function setupKeepAlive() {
 
 function render(state) {
   currentTabState = state;
-  if (container && playAllBtn) {
-    renderMonitor(state, container, playAllBtn);
+  if (container && playAllBtn && downloadAllBtn && clearAllBtn && monitorProgress) {
+    renderMonitor(state, container, playAllBtn, downloadAllBtn, clearAllBtn, monitorProgress);
   }
 }
 
@@ -46,6 +49,22 @@ function handleMonitorClick(event) {
   }
 }
 
+function handleDownloadAll() {
+  if (!currentTabState.createdTabs || currentTabState.createdTabs.length === 0) {
+    alert("No data to download.");
+    return;
+  }
+  const allData = currentTabState.createdTabs.map(tabInfo => ({
+    card_name: tabInfo.cardName,
+    prompt_content: tabInfo.cardContent || '',
+    ai_response: tabInfo.responseText || null,
+    response_timestamp: tabInfo.responseTimestamp || null
+  }));
+
+  const filename = `all_cards_data_${new Date().toISOString().slice(0, 10)}.json`;
+  downloadJSON(allData, filename);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   setupKeepAlive();
 
@@ -53,7 +72,18 @@ document.addEventListener('DOMContentLoaded', () => {
   chrome.runtime.onMessage.addListener(msg => msg.action === "updateTabState" && render(msg.payload));
   
   container.addEventListener('click', handleMonitorClick);
+  
   playAllBtn.addEventListener('click', () => {
       chrome.runtime.sendMessage({ action: "playAllTabs" });
+  });
+
+  downloadAllBtn.addEventListener('click', handleDownloadAll);
+  
+  clearAllBtn.addEventListener('click', () => {
+    if (currentTabState.createdTabs.length > 0) {
+      if (confirm('Are you sure you want to close all monitored tabs and clear the list?')) {
+        chrome.runtime.sendMessage({ action: "clearAllTabs" });
+      }
+    }
   });
 });

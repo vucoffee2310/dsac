@@ -1,4 +1,4 @@
-export function automationScript(promptText) {
+export function automationScript(promptText, cardName) {
     'use strict';
     const wait = (ms = 500) => new Promise(resolve => setTimeout(resolve, ms));
     const waitFor = async (selector, { all = false, retries = 10 } = {}) => {
@@ -26,20 +26,55 @@ export function automationScript(promptText) {
         badge.textContent = text;
         badge.style.backgroundColor = color;
     };
-    const monitorAndReportResponse = async () => {
-        await waitFor('ms-chat-turn [data-turn-role="Model"]', { retries: 20 });
-        let previousContent, stableChecks = 0;
-        while (stableChecks < 4) {
-            const currentContent = [...document.querySelectorAll("ms-chat-turn")].pop()?.outerHTML;
-            stableChecks = currentContent === previousContent ? stableChecks + 1 : 0;
-            previousContent = currentContent;
+    const monitorAndReportResponse = () => new Promise(async (resolve, reject) => {
+        while (document.querySelectorAll("ms-chat-turn").length < 3) {
             await wait(500);
         }
-        const responseText = [...document.querySelectorAll("ms-chat-turn")].pop()?.querySelector('[data-turn-role="Model"]')?.innerText.trim();
-        if (!responseText) throw new Error("No response text found to report.");
-        chrome.runtime.sendMessage({ action: "updateDashboard", responseText, timestamp: new Date().toLocaleString() });
-    };
+
+        let previousText = '';
+        let stableChecks = 0;
+        const maxStableChecks = 5;
+        const intervalMs = 500;
+
+        const intervalId = setInterval(() => {
+            const responseEl = [...document.querySelectorAll("ms-chat-turn")].pop()?.querySelector('[data-turn-role="Model"]');
+            const currentText = responseEl ? responseEl.innerText.trim() : '';
+
+            if (currentText !== previousText) {
+                previousText = currentText;
+                stableChecks = 0;
+                chrome.runtime.sendMessage({
+                    action: "updateDashboard",
+                    responseText: currentText,
+                    isComplete: false, // Mark as in-progress
+                    timestamp: new Date().toLocaleString()
+                });
+            } else {
+                stableChecks++;
+            }
+
+            if (stableChecks >= maxStableChecks) {
+                clearInterval(intervalId);
+                chrome.runtime.sendMessage({
+                    action: "updateDashboard",
+                    responseText: previousText,
+                    isComplete: true, // Send one final message marking it as complete
+                    timestamp: new Date().toLocaleString()
+                });
+
+                if (!previousText) {
+                    reject(new Error("No response text found to report."));
+                } else {
+                    resolve();
+                }
+            }
+        }, intervalMs);
+    });
+    
     const runAutomation = async () => {
+        if (cardName) {
+            document.title = cardName;
+        }
         updateStatus('processing');
         try {
             (await waitFor("ms-model-selector-v3 button")).click(); await wait();
@@ -58,7 +93,12 @@ export function automationScript(promptText) {
         } catch (error) {
             updateStatus('not working');
             console.error("❌ Automation failed:", error.message);
-            chrome.runtime.sendMessage({ action: "updateDashboard", responseText: `[AUTOMATION ERROR] ${error.message}`, timestamp: new Date().toLocaleString() });
+            chrome.runtime.sendMessage({ 
+                action: "updateDashboard", 
+                responseText: `[AUTOMATION ERROR] ${error.message}`,
+                isComplete: true, // Mark errors as complete too
+                timestamp: new Date().toLocaleString() 
+            });
         }
     };
     runAutomation();

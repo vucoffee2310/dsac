@@ -52,8 +52,8 @@ export async function renderCards(gridElement, lines) {
     const preview = chunk.slice(0, PREVIEW_LINES).join('\n');
     const remaining = chunk.length - PREVIEW_LINES;
     cardsHtml.push(`
-      <div class="card" data-id="card_${index}" data-name="Card ${index}" data-content="${escapeHtml(chunk.join('\n'))}">
-        <h3>Card ${index}</h3>
+      <div class="card" data-id="card_${index}" data-name="${index}" data-content="${escapeHtml(chunk.join('\n'))}">
+        <h3>${index}</h3>
         <pre>${escapeHtml(preview) || '<em>(empty)</em>'}</pre>
         ${remaining > 0 ? `<small>+${remaining} more</small>` : ''}
       </div>`);
@@ -66,23 +66,17 @@ export async function renderCards(gridElement, lines) {
   });
 }
 
-// For monitor
-export function renderMonitor(state, containerElement, playAllBtnElement) {
-  playAllBtnElement.disabled = !state.createdTabs?.length;
-
-  if (!state.createdTabs?.length) {
-    containerElement.innerHTML = `<div class="placeholder">Click a card to monitor its tab.</div>`;
-    return;
-  }
-
-  const playingSet = new Set(state.playingTabs || []);
-
-  containerElement.innerHTML = state.createdTabs.map(tab => {
-    const isPlaying = playingSet.has(tab.id);
-    return `
-    <div class="monitor-entry ${isPlaying ? 'playing' : ''}" data-tab-id="${tab.id}">
+// Helper for creating the HTML for a single monitor entry
+const createMonitorEntryHtml = (tab, isPlaying) => {
+  const completeClass = tab.isComplete ? 'is-complete' : '';
+  const currentResponseText = tab.responseText || '';
+  return `
+    <div class="monitor-entry ${isPlaying ? 'playing' : ''} ${completeClass}" data-tab-id="${tab.id}">
       <div class="monitor-entry-header">
-        <p><strong>${escapeHtml(tab.cardName || 'N/A')}</strong> (Tab ID: ${tab.id})</p>
+        <p>
+          <strong>${escapeHtml(tab.cardName || 'N/A')}</strong>
+          <span class="completion-status">✅</span>
+        </p>
         <div class="monitor-buttons">
           <button class="btn btn-play">${isPlaying ? '⏹️ Playing...' : '▶️ Play'}</button>
           <button class="btn btn-download">📥 Download JSON</button>
@@ -92,15 +86,105 @@ export function renderMonitor(state, containerElement, playAllBtnElement) {
         <summary>View Original Prompt</summary>
         <pre>${escapeHtml(tab.cardContent || '(No content)')}</pre>
       </details>
-      ${tab.responseText ? `
-        <div class="monitor-response">
-          <h4>AI Response <small>(${tab.responseTimestamp})</small></h4>
-          <pre>${escapeHtml(tab.responseText)}</pre>
-        </div>` : `
-        <div class="monitor-response-placeholder">
-          <p>🤖 Response pending...</p>
-        </div>`
-      }
+      
+      <div class="response-area">
+        ${currentResponseText ? `
+          <details> <!-- REMOVED the 'open' attribute -->
+            <summary>View AI Response</summary>
+            <div class="monitor-response">
+              <h4>AI Response <small>(${tab.responseTimestamp})</small></h4>
+              <pre>${escapeHtml(currentResponseText)}</pre>
+            </div>
+          </details>` : `
+          <div class="monitor-response-placeholder">
+            <p>🤖 Response pending...</p>
+          </div>`
+        }
+      </div>
     </div>`;
-  }).join('');
+};
+
+// For monitor - Smartly updates the DOM instead of replacing innerHTML
+export function renderMonitor(state, containerElement, playAllBtnElement, downloadAllBtnElement, clearAllBtnElement, progressElement) {
+  const total = state.createdTabs?.length || 0;
+  const finished = state.createdTabs?.filter(t => t.isComplete).length || 0;
+  const hasTabs = total > 0;
+
+  playAllBtnElement.disabled = !hasTabs;
+  downloadAllBtnElement.disabled = !hasTabs;
+  clearAllBtnElement.disabled = !hasTabs;
+
+  if (hasTabs) {
+    progressElement.textContent = `Progress: ${finished} / ${total} completed`;
+  } else {
+    progressElement.textContent = `Awaiting jobs...`;
+  }
+
+  const placeholder = containerElement.querySelector('.placeholder');
+
+  if (!hasTabs) {
+    if (!placeholder) {
+      containerElement.innerHTML = `<div class="placeholder">Click a card to monitor its tab.</div>`;
+    }
+    containerElement.querySelectorAll('.monitor-entry').forEach(e => e.remove());
+    return;
+  } else if (placeholder) {
+    placeholder.remove();
+  }
+
+  const playingSet = new Set(state.playingTabs || []);
+  const newTabIds = new Set(state.createdTabs.map(t => t.id));
+
+  containerElement.querySelectorAll('.monitor-entry').forEach(entry => {
+    const tabId = parseInt(entry.dataset.tabId, 10);
+    if (!newTabIds.has(tabId)) {
+      entry.remove();
+    }
+  });
+
+  [...state.createdTabs].reverse().forEach((tab, index) => {
+    let entry = containerElement.querySelector(`.monitor-entry[data-tab-id="${tab.id}"]`);
+    const isPlaying = playingSet.has(tab.id);
+
+    if (!entry) {
+      const newEntryHtml = createMonitorEntryHtml(tab, isPlaying);
+      if (index === 0) {
+        containerElement.insertAdjacentHTML('afterbegin', newEntryHtml);
+      } else {
+        const previousTabId = state.createdTabs[state.createdTabs.length - index].id;
+        const previousEntry = containerElement.querySelector(`.monitor-entry[data-tab-id="${previousTabId}"]`);
+        previousEntry?.insertAdjacentHTML('afterend', newEntryHtml);
+      }
+    } else {
+      entry.classList.toggle('playing', isPlaying);
+      entry.classList.toggle('is-complete', tab.isComplete);
+      entry.querySelector('.btn-play').textContent = isPlaying ? '⏹️ Playing...' : '▶️ Play';
+      
+      const responseArea = entry.querySelector('.response-area');
+      const currentResponse = tab.responseText || '';
+      const placeholderEl = responseArea.querySelector('.monitor-response-placeholder');
+
+      if (placeholderEl && currentResponse) {
+        responseArea.innerHTML = `
+          <details> <!-- REMOVED the 'open' attribute -->
+            <summary>View AI Response</summary>
+            <div class="monitor-response">
+              <h4>AI Response <small>(${tab.responseTimestamp})</small></h4>
+              <pre>${escapeHtml(currentResponse)}</pre>
+            </div>
+          </details>`;
+      } 
+      else if (!placeholderEl && currentResponse) {
+        const preEl = responseArea.querySelector('pre');
+        const smallEl = responseArea.querySelector('small');
+
+        if (preEl && preEl.textContent !== currentResponse) {
+          preEl.textContent = currentResponse;
+        }
+        if (smallEl) {
+          smallEl.textContent = `(${tab.responseTimestamp})`;
+        }
+      }
+    }
+  });
 }

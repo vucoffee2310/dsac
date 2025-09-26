@@ -41,10 +41,18 @@ export async function renderCards(grid, lines, linesPerCard = 200) {
 }
 
 // --- Monitor Rendering ---
-const createMonitorEntry = (tab, isPlaying) => `
-  <div class="monitor-entry ${isPlaying ? 'playing' : ''} ${tab.isComplete ? 'is-complete' : ''}" data-tab-id="${tab.id}">
+const createMonitorEntry = (tab, isPlaying) => {
+  const isCancelled = tab.cancelled;
+  const statusText = isCancelled 
+    ? '❌ Cancelled' 
+    : tab.isComplete ? '✅' : '';
+  
+  return `
+  <div class="monitor-entry ${isPlaying ? 'playing' : ''} ${tab.isComplete ? 'is-complete' : ''} ${isCancelled ? 'cancelled' : ''}" data-tab-id="${tab.id}">
     <div class="monitor-entry-header">
-      <p><strong>${escapeHtml(tab.cardName ?? 'N/A')}</strong><span class="completion-status">✅</span></p>
+      <p><strong>${escapeHtml(tab.cardName ?? 'N/A')}</strong>
+        ${statusText ? `<span class="completion-status">${statusText}</span>` : ''}
+      </p>
       <div class="monitor-buttons">
         <button class="btn btn-play" data-tooltip="${isPlaying ? "Stop Audio" : "Play Audio"}">${isPlaying ? '⏹️ Stop' : '▶️ Play'}</button>
         <button class="btn btn-download" data-tooltip="Download JSON">📥</button>
@@ -58,6 +66,7 @@ const createMonitorEntry = (tab, isPlaying) => `
       }
     </div>
   </div>`;
+};
 
 const updateEntry = (el, tab, isPlaying) => {
   el.classList.toggle('playing', isPlaying);

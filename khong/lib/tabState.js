@@ -36,15 +36,43 @@ export const tabState = {
   },
 
   removeTab: (tabId) => {
-    const initialLen = createdTabs.length;
-    const wasPlaying = playingTabs.delete(tabId);
-    createdTabs = createdTabs.filter(t => t.id !== tabId);
-    if (createdTabs.length !== initialLen || wasPlaying) persistAndNotify();
+    const tab = createdTabs.find(t => t.id === tabId);
+    if (!tab) return;
+
+    if (!tab.isComplete) {
+      // Mark as cancelled instead of deleting immediately
+      tab.isComplete = true;
+      tab.responseText = "[Cancelled: tab closed before completion]";
+      tab.responseTimestamp = new Date().toLocaleString();
+      tab.cancelled = true;
+      persistAndNotify();
+
+      // Auto-remove after 5 seconds
+      setTimeout(() => {
+        const idx = createdTabs.findIndex(t => t.id === tabId);
+        if (idx !== -1 && createdTabs[idx].cancelled) {
+          createdTabs.splice(idx, 1);
+          playingTabs.delete(tabId);
+          persistAndNotify();
+        }
+      }, 5000);
+    } else {
+      // Already complete — remove immediately
+      const initialLen = createdTabs.length;
+      const wasPlaying = playingTabs.delete(tabId);
+      createdTabs = createdTabs.filter(t => t.id !== tabId);
+      if (createdTabs.length !== initialLen || wasPlaying) {
+        persistAndNotify();
+      }
+    }
   },
 
   updateTabResponse: (tabId, updates) => {
     const tab = createdTabs.find(t => t.id === tabId);
-    if (!tab) return;
+    if (!tab) {
+      // Tab was already removed (e.g., user closed it)
+      return;
+    }
 
     // Apply updates
     Object.assign(tab, {
@@ -53,7 +81,7 @@ export const tabState = {
       isComplete: updates.isComplete
     });
 
-    // ✅ If the tab is now complete AND was playing → stop audio
+    // If the tab is now complete AND was playing → stop audio
     if (updates.isComplete && playingTabs.has(tabId)) {
       playingTabs.delete(tabId);
       chrome.tabs.sendMessage(tabId, { stop: true }).catch(() => {});
@@ -69,7 +97,6 @@ export const tabState = {
   },
 
   playTab: (tabId) => {
-    // Toggle individual tab
     if (playingTabs.has(tabId)) {
       playingTabs.delete(tabId);
       chrome.tabs.sendMessage(tabId, { stop: true }).catch(() => {});
@@ -96,8 +123,8 @@ export const tabState = {
     persistAndNotify();
   },
 
-  // Only stop if tab is LEAVING AI Studio
   stopIfNavigatedAway: (tabId, url) => {
+    // ✅ Fixed: removed trailing spaces in URL
     const isAiStudio = url?.startsWith('https://aistudio.google.com/prompts/new_chat');
     const knownTab = createdTabs.some(t => t.id === tabId);
     if (knownTab && !isAiStudio && playingTabs.delete(tabId)) {

@@ -130,3 +130,10 @@ body {
 .response-area { margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color); }
 .monitor-response h4 { margin: 0 0 10px; font-size: 14px; font-weight: 600; }
 .monitor-response h4 small { font-weight: 400; color: var(--text-light); }
+.monitor-entry.cancelled {
+  border-color: var(--danger);
+  opacity: 0.85;
+}
+.monitor-entry.cancelled .completion-status {
+  color: var(--danger);
+}

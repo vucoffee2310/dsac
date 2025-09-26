@@ -15,7 +15,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
   if (
     changeInfo.status === 'complete' &&
-    tab.url?.startsWith('https://aistudio.google.com/prompts/new_chat')
+    tab.url?.startsWith('https://aistudio.google.com/prompts/new_chat') // ✅ no trailing spaces
   ) {
     const tabToProcess = tabState.findInjectableTab(tabId);
     if (tabToProcess) {
@@ -30,9 +30,14 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 chrome.tabs.onRemoved.addListener(tabState.removeTab);
 
-chrome.runtime.onMessage.addListener((req, sender) => {
+// ✅ Correct message handling: only respond when needed
+chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
+  if (req.action === 'getTabState') {
+    sendResponse(tabState.getState());
+    return;
+  }
+
   const handlers = {
-    getTabState: () => tabState.getState(),
     logTabCreation: () => tabState.addTab(req.payload),
     updateDashboard: () => sender.tab && tabState.updateTabResponse(sender.tab.id, req),
     playTab: () => tabState.playTab(req.tabId),
@@ -44,8 +49,8 @@ chrome.runtime.onMessage.addListener((req, sender) => {
   if (handler) {
     const result = handler();
     if (result instanceof Promise) result.catch(console.error);
-    return true; // for async messaging
   }
+  // Do NOT return true — no async response expected
 });
 
 chrome.action.onClicked.addListener(() =>

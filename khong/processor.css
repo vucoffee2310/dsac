@@ -1,0 +1,132 @@
+:root {
+  --font-family: 'Inter', sans-serif;
+  --bg-color: #f8f9fa;
+  --panel-bg: #ffffff;
+  --text-color: #212529;
+  --text-light: #6c757d;
+  --border-color: #dee2e6;
+  --accent: #0d6efd;
+  --danger: #dc3545;
+  --success: #198754;
+  --code-bg: #f1f3f5;
+  --tooltip-bg: #212529;
+  --tooltip-text: #ffffff;
+}
+
+[data-theme="dark"] {
+  --bg-color: #121212;
+  --panel-bg: #1e1e1e;
+  --text-color: #e9ecef;
+  --text-light: #adb5bd;
+  --border-color: #343a40;
+  --accent: #3b82f6;
+  --danger: #f06565;
+  --success: #4ade80;
+  --code-bg: #2c2c2c;
+  --tooltip-bg: #e9ecef;
+  --tooltip-text: #121212;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: var(--font-family); margin: 0; background: var(--bg-color); color: var(--text-color);
+  display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 24px;
+  transition: background-color 0.2s, color 0.2s;
+}
+.container {
+  display: flex; width: 100%; max-width: 1400px; height: calc(100vh - 48px);
+  background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+.panel { display: flex; flex-direction: column; height: 100%; }
+.left-panel { flex: 1; border-right: 1px solid var(--border-color); }
+.right-panel { flex: 1; /* Inherits background from body for seamless look */ }
+
+.panel-header { padding: 24px 30px; }
+.panel-header h2 { margin: 0 0 8px; font-size: 22px; font-weight: 600; }
+.panel-header p { margin: 0; color: var(--text-light); font-size: 14px; }
+.header-top-row, .monitor-header-main { display: flex; justify-content: space-between; align-items: center; }
+
+/* --- CONTROLS & UNIFIED ICON BUTTONS --- */
+.controls { display: flex; gap: 12px; padding: 12px 30px; border-bottom: 1px solid var(--border-color); align-items: center; }
+.batch-controls { display: flex; gap: 8px; align-items: center; margin-left: auto; }
+.icon-button-group { display: flex; gap: 8px; }
+
+.btn {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; padding: 0;
+  border: 1px solid transparent; border-radius: 50%;
+  background: transparent; cursor: pointer; font-size: 16px;
+  transition: background-color 0.2s, color 0.2s; color: var(--text-light);
+}
+.btn:hover:not(:disabled) { background-color: var(--code-bg); color: var(--text-color); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary:hover:not(:disabled) { background: var(--accent); color: white; }
+.btn-danger:hover:not(:disabled) { background: var(--danger); color: white; }
+#fileInput { display: none; }
+.theme-btn.active { background: var(--accent); color: white; }
+
+/* --- FAST CSS TOOLTIPS --- */
+[data-tooltip]::before {
+  content: attr(data-tooltip); position: absolute; bottom: calc(100% + 8px); left: 50%;
+  transform: translateX(-50%); padding: 6px 12px; border-radius: 6px;
+  background: var(--tooltip-bg); color: var(--tooltip-text);
+  font-size: 12px; font-weight: 500; white-space: nowrap;
+  opacity: 0; visibility: hidden; transition: opacity 0.2s, visibility 0.2s; pointer-events: none; z-index: 10;
+}
+[data-tooltip]:hover::before { opacity: 1; visibility: visible; }
+
+#batchOpenCount {
+  padding: 8px 12px; border-radius: 20px; border: 1px solid var(--border-color);
+  font-family: var(--font-family); font-size: 14px; width: 70px;
+  background: var(--panel-bg); color: var(--text-color); text-align: center;
+}
+
+/* --- CARD GRID & MONITOR ENTRIES --- */
+.card-grid { padding: 24px 30px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+.card, .monitor-entry {
+  background: var(--panel-bg); padding: 20px; border-radius: 6px;
+  border: 1px solid var(--border-color);
+  transition: border-color 0.2s;
+}
+.card { cursor: pointer; }
+.card:hover { border-color: var(--accent); }
+.card h3 { margin: 0 0 12px; font-size: 16px; color: var(--accent); font-weight: 600; }
+.card pre { margin: 0 0 8px; font-size: 13px; line-height: 1.5; color: var(--text-light); max-height: 100px; overflow: hidden; text-overflow: ellipsis; }
+
+/* --- STATE INDICATORS --- */
+.card-clicked, .card-clicked:hover { border-color: var(--success); }
+.card-clicked h3 { color: var(--success); }
+.monitor-entry.playing { border-color: var(--success); }
+.monitor-entry.is-complete .monitor-entry-header p strong { color: var(--success); }
+
+/* --- MONITOR --- */
+#createdTabs { padding: 24px 30px; overflow-y: auto; }
+.monitor-entry { margin-bottom: 12px; font-size: 14px; padding: 15px 20px; }
+.monitor-entry-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.monitor-entry-header strong { font-weight: 600; color: var(--text-color); }
+.monitor-buttons { display: flex; gap: 8px; }
+.btn-play, .btn-download {
+  font-weight: 500; font-size: 12px; padding: 4px 12px; border: 1px solid var(--border-color);
+  border-radius: 20px; background: transparent; color: var(--text-light);
+  cursor: pointer; transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+.btn-play:hover, .btn-download:hover { background-color: var(--code-bg); color: var(--text-color); }
+.monitor-entry.playing .btn-play { background: var(--success); color: white; border-color: var(--success); }
+
+.completion-status { display: inline-block; margin-left: 8px; opacity: 0; transform: scale(0.8); transition: all 0.3s; }
+.monitor-entry.is-complete .completion-status { opacity: 1; transform: scale(1); }
+.placeholder { padding: 40px 20px; text-align: center; border: 2px dashed var(--border-color); border-radius: 8px; color: var(--text-light); }
+.card-grid .placeholder { grid-column: 1 / -1; }
+
+/* Details, Summary & Code Blocks */
+.monitor-entry details { margin-top: 12px; }
+.monitor-entry summary { cursor: pointer; font-weight: 500; color: var(--accent); }
+.monitor-entry pre, .monitor-response pre {
+  margin-top: 10px; background: var(--code-bg); padding: 12px; border-radius: 6px;
+  font-size: 13px; max-height: 250px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+}
+.response-area { margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color); }
+.monitor-response h4 { margin: 0 0 10px; font-size: 14px; font-weight: 600; }
+.monitor-response h4 small { font-weight: 400; color: var(--text-light); }

@@ -78,15 +78,26 @@ const updateEntry = (el, tab, isPlaying) => {
     btn.dataset.tooltip = isPlaying ? 'Stop Audio' : 'Play Audio';
   }
 
-  const area = el.querySelector('.response-area');
-  if (tab.responseText && area.querySelector('.monitor-response-placeholder')) {
-    area.innerHTML = `<details><summary>View AI Response</summary>
-      <div class="monitor-response">
-        <h4>AI Response <small>(${tab.responseTimestamp})</small></h4>
-        <pre>${escapeHtml(tab.responseText)}</pre>
-      </div>
-    </details>`;
-  }
+    const area = el.querySelector('.response-area');
+    if (tab.responseText) {
+        const existingResponse = area.querySelector('.monitor-response pre');
+        if (existingResponse) {
+            // Update existing response
+            existingResponse.textContent = tab.responseText;
+            const timestampEl = area.querySelector('.monitor-response h4 small');
+            if (timestampEl && tab.responseTimestamp) {
+            timestampEl.textContent = `(${tab.responseTimestamp})`;
+            }
+        } else {
+            // First-time render
+            area.innerHTML = `<details><summary>View AI Response</summary>
+            <div class="monitor-response">
+                <h4>AI Response <small>(${tab.responseTimestamp || ''})</small></h4>
+                <pre>${escapeHtml(tab.responseText)}</pre>
+            </div>
+            </details>`;
+        }
+    }
 };
 
 export function renderMonitor(state, container, playAllBtn, downloadAllBtn, clearAllBtn, progress) {

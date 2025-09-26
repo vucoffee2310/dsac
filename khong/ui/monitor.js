@@ -23,9 +23,12 @@ const getTabData = tab => ({
   response_timestamp: tab.responseTimestamp || null
 });
 
+
 function render(state) {
   currentTabState = state;
   renderMonitor(state, container, playAllBtn, downloadAllBtn, clearAllBtn, monitorProgress);
+  const anyPlaying = state.playingTabs.length > 0;
+  playAllBtn.textContent = anyPlaying ? '⏹️ Stop All' : '▶️ Play All';
 }
 
 function handleMonitorClick(e) {
@@ -56,9 +59,15 @@ document.addEventListener('DOMContentLoaded', () => {
   chrome.runtime.onMessage.addListener(msg => {
     if (msg.action === "updateTabState") render(msg.payload);
   });
+
   container.addEventListener('click', handleMonitorClick);
-  playAllBtn.addEventListener('click', () => chrome.runtime.sendMessage({ action: "playAllTabs" }));
+  
+  playAllBtn.addEventListener('click', () => {
+    chrome.runtime.sendMessage({ action: "playAllTabs" });
+  });
+
   downloadAllBtn.addEventListener('click', handleDownloadAll);
+  
   clearAllBtn.addEventListener('click', () => {
     if (currentTabState.createdTabs.length && confirm('Clear all tabs?')) {
       chrome.runtime.sendMessage({ action: "clearAllTabs" });

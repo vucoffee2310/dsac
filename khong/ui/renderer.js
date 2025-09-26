@@ -46,7 +46,7 @@ const createMonitorEntry = (tab, isPlaying) => `
     <div class="monitor-entry-header">
       <p><strong>${escapeHtml(tab.cardName ?? 'N/A')}</strong><span class="completion-status">✅</span></p>
       <div class="monitor-buttons">
-        <button class="btn btn-play" data-tooltip="${isPlaying ? "Stop Audio" : "Play Audio"}">${isPlaying ? '⏹️' : '▶️'}</button>
+        <button class="btn btn-play" data-tooltip="${isPlaying ? "Stop Audio" : "Play Audio"}">${isPlaying ? '⏹️ Stop' : '▶️ Play'}</button>
         <button class="btn btn-download" data-tooltip="Download JSON">📥</button>
       </div>
     </div>
@@ -62,18 +62,21 @@ const createMonitorEntry = (tab, isPlaying) => `
 const updateEntry = (el, tab, isPlaying) => {
   el.classList.toggle('playing', isPlaying);
   el.classList.toggle('is-complete', tab.isComplete);
+
   const btn = el.querySelector('.btn-play');
-  btn.textContent = isPlaying ? '⏹️' : '▶️';
-  btn.dataset.tooltip = isPlaying ? 'Stop Audio' : 'Play Audio';
+  if (btn) {
+    btn.textContent = isPlaying ? '⏹️' : '▶️';
+    btn.dataset.tooltip = isPlaying ? 'Stop Audio' : 'Play Audio';
+  }
+
   const area = el.querySelector('.response-area');
-  const placeholder = area.querySelector('.monitor-response-placeholder');
-  if (placeholder && tab.responseText) {
-    area.innerHTML = `<details><summary>View AI Response</summary><div class="monitor-response"><h4>AI Response <small>(${tab.responseTimestamp})</small></h4><pre>${escapeHtml(tab.responseText)}</pre></div></details>`;
-  } else if (!placeholder && tab.responseText) {
-    const pre = area.querySelector('pre');
-    const small = area.querySelector('small');
-    if (pre) pre.textContent = tab.responseText;
-    if (small) small.textContent = `(${tab.responseTimestamp})`;
+  if (tab.responseText && area.querySelector('.monitor-response-placeholder')) {
+    area.innerHTML = `<details><summary>View AI Response</summary>
+      <div class="monitor-response">
+        <h4>AI Response <small>(${tab.responseTimestamp})</small></h4>
+        <pre>${escapeHtml(tab.responseText)}</pre>
+      </div>
+    </details>`;
   }
 };
 

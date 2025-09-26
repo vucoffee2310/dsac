@@ -1,3 +1,4 @@
+// lib/audio_injector.js
 (() => {
   if (window.__AUDIO_INJECTOR_LOADED__) return;
   window.__AUDIO_INJECTOR_LOADED__ = true;
@@ -13,12 +14,15 @@
     return buffer;
   };
 
-  chrome.runtime.onMessage.addListener(async (message) => {
+  chrome.runtime.onMessage.addListener((message) => {
     if (message.play) {
-      if (!audioContext) audioContext = new AudioContext();
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
       if (audioSource) audioSource.stop();
-      if (audioContext.state === 'suspended') await audioContext.resume();
-      
+      if (audioContext.state === 'suspended') {
+        audioContext.resume().catch(console.warn);
+      }
       audioSource = audioContext.createBufferSource();
       audioSource.buffer = createSilentBuffer(audioContext);
       audioSource.loop = true;
@@ -30,6 +34,6 @@
         audioSource = null;
       }
     }
-    return true;
+    // ✅ No return value — content scripts must not return true
   });
 })();

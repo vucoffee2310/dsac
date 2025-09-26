@@ -1,92 +1,63 @@
-// ui/processor.js
 import { addClickedCard, clearClickedCards } from '../states/cards.js';
 import { renderCards } from './renderer.js';
-import { PROMPT_PREFIX } from '../services/promptConfig.js'; //
+import { PROMPT_PREFIX } from '../services/promptConfig.js';
 
-const grid = document.getElementById('grid');
-const fileInput = document.getElementById('fileInput');
-const clearSavedBtn = document.getElementById('clearSaved');
-const batchOpenBtn = document.getElementById('batchOpenBtn');
-const batchOpenCountInput = document.getElementById('batchOpenCount');
-const themeSwitcher = document.getElementById('themeSwitcher');
+const g = document.getElementById('grid'), f = document.getElementById('fileInput'),
+      clr = document.getElementById('clearSaved'), batchBtn = document.getElementById('batchOpenBtn'),
+      batchIn = document.getElementById('batchOpenCount'), themeEl = document.getElementById('themeSwitcher'),
+      themeKey = 'selected-card-theme';
 
-const themeStorageKey = 'selected-card-theme';
+const applyTheme = t => {
+  const root = document.documentElement, eff = t === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : t;
+  root.setAttribute('data-theme', eff);
+  themeEl.querySelectorAll('.theme-btn').forEach(b => b.classList.toggle('active', b.dataset.theme === t));
+};
 
-function applyTheme(theme) {
-  const root = document.documentElement;
-  let effective = theme;
-  if (theme === 'system') {
-    effective = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  }
-  root.setAttribute('data-theme', effective);
-  themeSwitcher.querySelectorAll('.theme-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.theme === theme);
+const initTheme = () => {
+  const s = localStorage.getItem(themeKey) || 'system';
+  applyTheme(s);
+  themeEl.addEventListener('click', e => {
+    const b = e.target.closest('.theme-btn');
+    if (b) { localStorage.setItem(themeKey, b.dataset.theme); applyTheme(b.dataset.theme); }
   });
-}
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => localStorage.getItem(themeKey) === 'system' && applyTheme('system'));
+};
 
-function initTheme() {
-  const saved = localStorage.getItem(themeStorageKey) || 'system';
-  applyTheme(saved);
-  themeSwitcher.addEventListener('click', (e) => {
-    const btn = e.target.closest('.theme-btn');
-    if (btn) {
-      localStorage.setItem(themeStorageKey, btn.dataset.theme);
-      applyTheme(btn.dataset.theme);
-    }
-  });
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    if (localStorage.getItem(themeStorageKey) === 'system') applyTheme('system');
-  });
-}
+const w = ms => new Promise(r => setTimeout(r, ms));
 
-const wait = (ms) => new Promise(r => setTimeout(r, ms));
-
-async function openCard(card) {
+const openCard = async card => {
   if (!card || card.classList.contains('card-clicked')) return;
   card.classList.add('card-clicked');
   const { id, name, content } = card.dataset;
   await addClickedCard(id);
   const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
-  const modified = PROMPT_PREFIX + JSON.stringify(lines);
-  const newTab = await chrome.tabs.create({ url: "https://aistudio.google.com/prompts/new_chat", active: false });
-  chrome.runtime.sendMessage({ action: "logTabCreation", payload: { id: newTab.id, cardName: name, cardContent: modified } });
-}
+  const mod = PROMPT_PREFIX + JSON.stringify(lines);
+  const tab = await chrome.tabs.create({ url: "https://aistudio.google.com/prompts/new_chat", active: false });
+  chrome.runtime.sendMessage({ action: "logTabCreation", payload: { id: tab.id, cardName: name, cardContent: mod } });
+};
 
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
-  grid.addEventListener('click', (e) => {
-    const card = e.target.closest('.card');
-    if (card) openCard(card);
-  });
-  fileInput.addEventListener('change', (e) => {
+  g.addEventListener('click', e => { const c = e.target.closest('.card'); c && openCard(c); });
+  f.addEventListener('change', e => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    file.text().then(text => {
-      const lines = text.split(/\r?\n/).filter(Boolean);
-      renderCards(grid, lines);
+    file?.text().then(txt => {
+      const lines = txt.split(/\r?\n/).filter(Boolean);
+      renderCards(g, lines);
     });
   });
-  clearSavedBtn.addEventListener('click', async () => {
+  clr.addEventListener('click', async () => {
     await clearClickedCards();
     alert('✅ Cleared all clicked card states.');
     document.querySelectorAll('.card.card-clicked').forEach(c => c.classList.remove('card-clicked'));
   });
-  batchOpenBtn.addEventListener('click', async () => {
-    const count = parseInt(batchOpenCountInput.value, 10);
-    if (isNaN(count) || count <= 0) {
-      alert('Enter valid number.'); return;
-    }
-    const unclicked = grid.querySelectorAll('.card:not(.card-clicked)');
-    const toOpen = Array.from(unclicked).slice(0, count);
-    if (!toOpen.length) { alert('No unclicked cards.'); return; }
-    batchOpenBtn.disabled = true;
-    batchOpenCountInput.disabled = true;
-    for (const card of toOpen) {
-      await openCard(card);
-      await wait(200);
-    }
-    batchOpenBtn.disabled = false;
-    batchOpenCountInput.disabled = false;
-    batchOpenCountInput.value = '';
+  batchBtn.addEventListener('click', async () => {
+    const n = parseInt(batchIn.value, 10);
+    if (isNaN(n) || n <= 0) return alert('Enter valid number.');
+    const unclicked = [...g.querySelectorAll('.card:not(.card-clicked)')].slice(0, n);
+    if (!unclicked.length) return alert('No unclicked cards.');
+    batchBtn.disabled = true; batchIn.disabled = true;
+    for (const c of unclicked) { await openCard(c); await w(200); }
+    batchBtn.disabled = false; batchIn.disabled = false; batchIn.value = '';
   });
 });

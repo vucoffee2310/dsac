@@ -1,76 +1,44 @@
-// ui/monitor.js
 import { renderMonitor, downloadJSON } from './renderer.js';
+let state = { createdTabs: [], playingTabs: [] };
+const c = document.getElementById('createdTabs'), p = document.getElementById('playAllTabs'),
+      d = document.getElementById('downloadAllJson'), x = document.getElementById('clearAllTabs'),
+      prog = document.getElementById('monitorProgress');
 
-let currentTabState = { createdTabs: [], playingTabs: [] };
-const container = document.getElementById('createdTabs');
-const playAllBtn = document.getElementById('playAllTabs');
-const downloadAllBtn = document.getElementById('downloadAllJson');
-const clearAllBtn = document.getElementById('clearAllTabs');
-const monitorProgress = document.getElementById('monitorProgress');
-
-function setupKeepAlive() {
+const setupKeepAlive = () => {
   let port = chrome.runtime.connect({ name: "keepAlive" });
-  port.onDisconnect.addListener(() => {
-    console.log("Reconnecting...");
-    setTimeout(setupKeepAlive, 5000);
-  });
-}
+  port.onDisconnect.addListener(() => setTimeout(setupKeepAlive, 5000));
+};
 
-const getTabData = tab => ({
-  card_name: tab.cardName,
-  prompt_content: tab.cardContent || '',
-  ai_response: tab.responseText || null,
-  response_timestamp: tab.responseTimestamp || null
-});
+const getTabData = t => ({ card_name: t.cardName, prompt_content: t.cardContent || '', ai_response: t.responseText || null, response_timestamp: t.responseTimestamp || null });
 
+const render = s => {
+  state = s;
+  renderMonitor(s, c, p, d, x, prog);
+  p.textContent = s.playingTabs.length ? '⏹️ Stop All' : '▶️ Play All';
+};
 
-function render(state) {
-  currentTabState = state;
-  renderMonitor(state, container, playAllBtn, downloadAllBtn, clearAllBtn, monitorProgress);
-  const anyPlaying = state.playingTabs.length > 0;
-  playAllBtn.textContent = anyPlaying ? '⏹️ Stop All' : '▶️ Play All';
-}
-
-function handleMonitorClick(e) {
+const handleClick = e => {
   const entry = e.target.closest('.monitor-entry');
   if (!entry) return;
-  const tabId = parseInt(entry.dataset.tabId, 10);
-  if (e.target.closest('.btn-play')) {
-    chrome.runtime.sendMessage({ action: "playTab", tabId });
-  } else if (e.target.closest('.btn-download')) {
-    const tab = currentTabState.createdTabs.find(t => t.id === tabId);
-    if (tab) {
-      const name = (tab.cardName || 'card').replace(/[\s\W]+/g, '_');
-      downloadJSON(getTabData(tab), `${name}_data.json`);
-    }
+  const id = parseInt(entry.dataset.tabId, 10);
+  if (e.target.closest('.btn-play')) chrome.runtime.sendMessage({ action: "playTab", tabId: id });
+  else if (e.target.closest('.btn-download')) {
+    const t = state.createdTabs.find(x => x.id === id);
+    if (t) downloadJSON(getTabData(t), `${(t.cardName || 'card').replace(/[\s\W]+/g, '_')}_data.json`);
   }
-}
+};
 
-function handleDownloadAll() {
-  const { createdTabs } = currentTabState;
-  if (!createdTabs?.length) return alert("No data.");
-  const filename = `all_cards_data_${new Date().toISOString().slice(0, 10)}.json`;
-  downloadJSON(createdTabs.map(getTabData), filename);
-}
+const downloadAll = () => {
+  if (!state.createdTabs.length) return alert("No data.");
+  downloadJSON(state.createdTabs.map(getTabData), `all_cards_data_${new Date().toISOString().slice(0, 10)}.json`);
+};
 
 document.addEventListener('DOMContentLoaded', () => {
   setupKeepAlive();
-  chrome.runtime.sendMessage({ action: "getTabState" }, res => res && render(res));
-  chrome.runtime.onMessage.addListener(msg => {
-    if (msg.action === "updateTabState") render(msg.payload);
-  });
-
-  container.addEventListener('click', handleMonitorClick);
-  
-  playAllBtn.addEventListener('click', () => {
-    chrome.runtime.sendMessage({ action: "playAllTabs" });
-  });
-
-  downloadAllBtn.addEventListener('click', handleDownloadAll);
-  
-  clearAllBtn.addEventListener('click', () => {
-    if (currentTabState.createdTabs.length && confirm('Clear all tabs?')) {
-      chrome.runtime.sendMessage({ action: "clearAllTabs" });
-    }
-  });
+  chrome.runtime.sendMessage({ action: "getTabState" }, r => r && render(r));
+  chrome.runtime.onMessage.addListener(m => m.action === "updateTabState" && render(m.payload));
+  c.addEventListener('click', handleClick);
+  p.addEventListener('click', () => chrome.runtime.sendMessage({ action: "playAllTabs" }));
+  d.addEventListener('click', downloadAll);
+  x.addEventListener('click', () => state.createdTabs.length && confirm('Clear all tabs?') && chrome.runtime.sendMessage({ action: "clearAllTabs" }));
 });

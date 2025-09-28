@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "TXT to Card Grid + AI Studio (Modular v2)",
+  "version": "1.7",
+  "description": "Processes a text file into clickable cards that automate tasks in new AI Studio tabs and monitors the results.",
+  "permissions": ["tabs", "storage", "scripting"],
+  "host_permissions": ["*://aistudio.google.com/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {},
+  "content_scripts": [{
+    "matches": ["*://aistudio.google.com/*"],
+    "js": ["services/audio.js"],
+    "run_at": "document_start"
+  }],
+  "web_accessible_resources": [{
+    "resources": [
+      "processor.html",
+      "processor.css",
+      "ui/*.js",
+      "states/*.js",
+      "automations/*.js",
+      "services/*.js"
+    ],
+    "matches": ["<all_urls>"]
+  }]
+}

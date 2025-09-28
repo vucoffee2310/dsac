@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en"> <!-- The data-theme attribute will be set here by JS -->
+<head>
+  <meta charset="UTF-8">
+  <title>Card Processor & Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="processor.css">
+</head>
+<body>
+  <div class="container">
+    <div class="panel left-panel">
+      <header class="panel-header">
+        <div class="header-top-row">
+          <h2>Card Processor</h2>
+          <div class="icon-button-group" id="themeSwitcher">
+            <button class="btn theme-btn" data-theme="light" data-tooltip="Light Theme">☀️</button>
+            <button class="btn theme-btn" data-theme="dark" data-tooltip="Dark Theme">🌙</button>
+            <button class="btn theme-btn" data-theme="system" data-tooltip="System Default">🖥️</button>
+          </div>
+        </div>
+        <p>Upload a .txt file. Click a card to send its content to a new AI Studio tab.</p>
+      </header>
+      <div class="controls">
+        <label for="fileInput" class="btn btn-primary" data-tooltip="Select .txt File">📂</label>
+        <input type="file" id="fileInput" accept=".txt">
+        <button id="clearSaved" class="btn btn-danger" data-tooltip="Clear Clicked State">🗑️</button>
+        <div class="batch-controls">
+          <input type="number" id="batchOpenCount" min="1" placeholder="Qty">
+          <button id="batchOpenBtn" class="btn btn-secondary" data-tooltip="Open Unclicked Tabs">🚀</button>
+        </div>
+      </div>
+      <div class="card-grid" id="grid">
+        <div class="placeholder">
+          <p>Please select a .txt file to begin.</p>
+        </div>
+      </div>
+    </div>
+    <div class="panel right-panel">
+      <header class="panel-header">
+        <div class="monitor-header-main">
+            <h2>Tab Monitor</h2>
+            <div class="icon-button-group">
+              <button id="playAllTabs" class="btn btn-secondary" disabled data-tooltip="Play All">▶️</button>
+              <button id="downloadAllJson" class="btn btn-secondary" disabled data-tooltip="Download All">📥</button>
+              <button id="clearAllTabs" class="btn btn-danger" disabled data-tooltip="Clear All">🗑️</button>
+            </div>
+        </div>
+        <p id="monitorProgress">Awaiting jobs...</p>
+      </header>
+      <div id="createdTabs">
+        <div class="placeholder">
+          <p>Click a card to monitor its tab.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="ui/processor.js"></script>
+  <script type="module" src="ui/monitor.js"></script>
+</body>
+</html>

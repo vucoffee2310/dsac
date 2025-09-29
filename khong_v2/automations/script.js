@@ -35,7 +35,7 @@ export function automationScript(promptText, cardName) {
       const el = [...document.querySelectorAll("ms-chat-turn")].pop()?.querySelector('[data-turn-role="Model"]');
       const cur = el?.innerText.trim() || '';
       if (cur !== prev) { prev = cur; checks = 0; report(cur, false); } else checks++;
-      await w(3000); // <-- Changed to 3-second interval
+      await w(5000); // <-- MODIFIED: Changed to 5-second interval
     }
     if (!prev) throw new Error("No response text found.");
     report(prev, true);
@@ -63,4 +63,5 @@ export function automationScript(promptText, cardName) {
       report(e.message, true, true);
     }
   })();
+
 }

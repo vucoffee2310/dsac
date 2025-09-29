@@ -1,4 +1,4 @@
-import { addClickedCard, clearClickedCards } from '../states/cards.js';
+import { addClickedCard, getSavedCards, saveCards, clearAllCardState } from '../states/cards.js';
 import { renderCards } from './renderer.js';
 import { PROMPT_PREFIX } from '../services/promptConfig.js';
 
@@ -7,8 +7,9 @@ const g = document.getElementById('grid'), f = document.getElementById('fileInpu
       batchIn = document.getElementById('batchOpenCount'), themeEl = document.getElementById('themeSwitcher'),
       themeKey = 'selected-card-theme';
 
-// Store card content in memory for the session, not in chrome.storage
-let cardLines = [];
+// --- NEW: Helper functions to access chrome.storage.local for the theme ---
+const getStorage = async (k) => (await chrome.storage.local.get(k))[k];
+const setStorage = (k, v) => chrome.storage.local.set({ [k]: v });
 
 const applyTheme = t => {
   const root = document.documentElement, eff = t === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : t;
@@ -16,14 +17,27 @@ const applyTheme = t => {
   themeEl.querySelectorAll('.theme-btn').forEach(b => b.classList.toggle('active', b.dataset.theme === t));
 };
 
-const initTheme = () => {
-  const s = localStorage.getItem(themeKey) || 'system';
+const initTheme = async () => {
+  // --- UPDATED: Read from chrome.storage.local (profile-specific) ---
+  const s = await getStorage(themeKey) || 'system';
   applyTheme(s);
-  themeEl.addEventListener('click', e => {
+  
+  themeEl.addEventListener('click', async (e) => {
     const b = e.target.closest('.theme-btn');
-    if (b) { localStorage.setItem(themeKey, b.dataset.theme); applyTheme(b.dataset.theme); }
+    if (b) {
+      // --- UPDATED: Write to chrome.storage.local ---
+      await setStorage(themeKey, b.dataset.theme);
+      applyTheme(b.dataset.theme);
+    }
   });
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => localStorage.getItem(themeKey) === 'system' && applyTheme('system'));
+
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', async () => {
+    // --- UPDATED: Check chrome.storage.local before applying system theme change ---
+    const currentTheme = await getStorage(themeKey) || 'system';
+    if (currentTheme === 'system') {
+      applyTheme('system');
+    }
+  });
 };
 
 const w = ms => new Promise(r => setTimeout(r, ms));
@@ -51,8 +65,11 @@ const openCard = async card => {
 document.addEventListener('DOMContentLoaded', async () => {
   initTheme();
 
-  // The page will now start with the placeholder, awaiting a file upload.
-  // The logic to restore cards from chrome.storage has been removed.
+  // --- Restore cards from storage on page load ---
+  const savedLines = await getSavedCards();
+  if (savedLines && savedLines.length > 0) {
+    renderCards(g, savedLines);
+  }
 
   g.addEventListener('click', e => { const c = e.target.closest('.card'); c && openCard(c); });
 
@@ -60,15 +77,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     const file = e.target.files?.[0];
     if (!file) return;
     const txt = await file.text();
-    // Store lines in the module-level variable instead of chrome.storage
-    cardLines = txt.split(/\r?\n/).filter(Boolean);
+    const cardLines = txt.split(/\r?\n/).filter(Boolean);
+    
+    // --- Save the parsed card data to storage ---
+    await saveCards(cardLines);
+    
     renderCards(g, cardLines);
   });
 
   clr.addEventListener('click', async () => {
-    await clearClickedCards();
-    alert('✅ Cleared all clicked card states.');
-    document.querySelectorAll('.card.card-clicked').forEach(c => c.classList.remove('card-clicked'));
+    // --- Use the combined clear function ---
+    await clearAllCardState();
+    alert('✅ Cleared all card data and clicked states.');
+    // Re-render the grid to show the placeholder
+    renderCards(g, []);
   });
 
   batchBtn.addEventListener('click', async () => {

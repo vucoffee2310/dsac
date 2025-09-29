@@ -43,10 +43,23 @@ const createEntry = (t, playing) => {
       </div>
     </details>
     <div class="response-area">
-      ${t.responseText ? `<details><summary>View AI Response</summary><div class="monitor-response"><h4>AI Response <small>(${t.responseTimestamp})</small></h4><pre>${esc(t.responseText)}</pre></div></details>` : `<div class="monitor-response-placeholder"><p>🤖 Response pending...</p></div>`}
+      ${t.responseText ? `<details data-lazy-response="true"><summary>View AI Response</summary></details>` : `<div class="monitor-response-placeholder"><p>🤖 Response pending...</p></div>`}
     </div>
   </div>`;
 };
+
+// --- FIX: Use a non-destructive DOM insertion method ---
+export function renderLazyResponse(detailsElement, tabData) {
+  if (!detailsElement || !tabData || !tabData.responseText) return;
+  // Create the HTML for the response block.
+  const responseHTML = `<div class="monitor-response">
+    <h4>AI Response <small>(${tabData.responseTimestamp || ''})</small></h4>
+    <pre>${esc(tabData.responseText)}</pre>
+  </div>`;
+  // Insert the HTML inside the <details> element, but after its existing content (the <summary>).
+  // This does NOT destroy and recreate the <summary> element.
+  detailsElement.insertAdjacentHTML('beforeend', responseHTML);
+}
 
 const updateEntry = (el, t, playing) => {
   el.classList.toggle('playing', playing);
@@ -55,9 +68,19 @@ const updateEntry = (el, t, playing) => {
   if (btn) { btn.textContent = playing ? '⏹️' : '▶️'; btn.dataset.tooltip = playing ? 'Stop Audio' : 'Play Audio'; }
   const area = el.querySelector('.response-area');
   if (t.responseText) {
-    const pre = area.querySelector('.monitor-response pre');
-    if (pre) { pre.textContent = t.responseText; const ts = area.querySelector('.monitor-response h4 small'); ts && t.responseTimestamp && (ts.textContent = `(${t.responseTimestamp})`); }
-    else area.innerHTML = `<details><summary>View AI Response</summary><div class="monitor-response"><h4>AI Response <small>(${t.responseTimestamp || ''})</small></h4><pre>${esc(t.responseText)}</pre></div></details>`;
+    const placeholder = area.querySelector('.monitor-response-placeholder');
+    if (placeholder) {
+      // Response just arrived, replace placeholder with the lazy details element
+      area.innerHTML = `<details data-lazy-response="true"><summary>View AI Response</summary></details>`;
+    } else {
+      // Response was already there. If it's already rendered, update its content.
+      const pre = area.querySelector('.monitor-response pre');
+      if (pre) {
+        pre.textContent = t.responseText;
+        const ts = area.querySelector('.monitor-response h4 small');
+        if (ts && t.responseTimestamp) { ts.textContent = `(${t.responseTimestamp})`; }
+      }
+    }
   }
 };
 

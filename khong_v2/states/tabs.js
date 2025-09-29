@@ -1,15 +1,59 @@
 import { getStorage, setStorage, removeStorage } from '../services/storage.js';
-const K = 'createdTabs_v1';
+const TABS_K = 'createdTabs_v1';
+const PLAYING_K = 'playingTabs_v1';
+const DEBOUNCE_DELAY = 250; // ms to wait after last event
+const THROTTLE_LIMIT = 5000; // ms max wait time between updates
+
 let tabs = [];
-const playing = new Set();
-(async () => { const s = await getStorage(K); if (s) tabs = s.map(t => ({ ...t, injected: t.injected !== false })); })();
-const notify = async (p) => {
+let playing = new Set(); // Will be overwritten by storage
+let debounceTimeout = null;
+let throttleTimeout = null;
+
+// --- FIX: Load BOTH tabs and playing state from storage on startup ---
+(async () => {
+  const [savedTabs, savedPlaying] = await Promise.all([
+    getStorage(TABS_K),
+    getStorage(PLAYING_K)
+  ]);
+  if (savedTabs) {
+    tabs = savedTabs.map(t => ({ ...t, injected: t.injected !== false }));
+  }
+  if (savedPlaying) {
+    playing = new Set(savedPlaying);
+  }
+})();
+
+const executeNotification = async () => {
+  if (debounceTimeout) clearTimeout(debounceTimeout);
+  if (throttleTimeout) clearTimeout(throttleTimeout);
+  debounceTimeout = null;
+  throttleTimeout = null;
+
   try {
+    const payload = { createdTabs: tabs, playingTabs: [...playing] };
     const ts = await chrome.tabs.query({ url: chrome.runtime.getURL("processor.html") });
-    await Promise.allSettled(ts.map(t => chrome.tabs.sendMessage(t.id, { action: "updateTabState", payload: p })));
+    await Promise.allSettled(ts.map(t => chrome.tabs.sendMessage(t.id, { action: "updateTabState", payload })));
   } catch (e) { console.error("Notify failed:", e); }
 };
-const save = async () => { await setStorage(K, tabs); notify({ createdTabs: tabs, playingTabs: [...playing] }); };
+
+const notify = () => {
+  if (debounceTimeout) clearTimeout(debounceTimeout);
+  debounceTimeout = setTimeout(executeNotification, DEBOUNCE_DELAY);
+
+  if (!throttleTimeout) {
+    throttleTimeout = setTimeout(executeNotification, THROTTLE_LIMIT);
+  }
+};
+
+// --- FIX: Save BOTH tabs and playing state ---
+const save = async () => {
+  await Promise.all([
+    setStorage(TABS_K, tabs),
+    setStorage(PLAYING_K, [...playing]) // Convert Set to Array for storage
+  ]);
+  notify();
+};
+
 export const tabState = {
   addTab: (p) => { if (!tabs.some(t => t.id === p.id)) { tabs.push({ ...p, injected: false, isComplete: false }); save(); } },
   removeTab: (id) => {
@@ -18,8 +62,7 @@ export const tabState = {
     if (!t.isComplete) {
       Object.assign(t, { isComplete: true, responseText: "[Cancelled: tab closed before completion]", responseTimestamp: new Date().toLocaleString(), cancelled: true });
       save();
-      // Use chrome.alarms for reliable delayed removal instead of setTimeout
-      chrome.alarms.create(`cleanup_tab_${id}`, { delayInMinutes: 0.1 }); // ~6 seconds
+      chrome.alarms.create(`cleanup_tab_${id}`, { delayInMinutes: 0.1 });
     } else {
       const l = tabs.length;
       const wp = playing.delete(id);
@@ -27,7 +70,6 @@ export const tabState = {
       if (tabs.length !== l || wp) save();
     }
   },
-  // New function to be called by the background script's alarm listener
   finalizeRemove: (id) => {
     const i = tabs.findIndex(x => x.id === id);
     if (i !== -1 && tabs[i].cancelled) {
@@ -40,22 +82,40 @@ export const tabState = {
     const t = tabs.find(x => x.id === id);
     if (!t) return;
     Object.assign(t, { responseText: u.responseText, responseTimestamp: u.timestamp, isComplete: u.isComplete });
-    if (u.isComplete && playing.has(id)) { playing.delete(id); chrome.tabs.sendMessage(id, { stop: true }).catch(() => {}); }
+    if (u.isComplete && playing.has(id)) { 
+      playing.delete(id); 
+      chrome.tabs.sendMessage(id, { stop: true }).catch(() => {}); 
+    }
     save();
   },
   findInjectableTab: (id) => { const t = tabs.find(x => x.id === id && !x.injected); if (t) t.injected = true; return t; },
   playTab: (id) => {
-    if (playing.has(id)) { playing.delete(id); chrome.tabs.sendMessage(id, { stop: true }).catch(() => {}); }
-    else { playing.add(id); chrome.tabs.sendMessage(id, { play: true }).catch(() => {}); }
+    const t = tabs.find(x => x.id === id);
+    if (!t) return;
+    if (playing.has(id)) {
+      playing.delete(id);
+      chrome.tabs.sendMessage(id, { stop: true }).catch(() => {});
+    } else if (!t.isComplete) {
+      playing.add(id);
+      chrome.tabs.sendMessage(id, { play: true }).catch(() => {});
+    }
     save();
   },
   playAllTabs: () => {
-    const ids = tabs.map(t => t.id);
-    const any = ids.some(id => playing.has(id));
-    ids.forEach(id => {
-      if (any) { playing.delete(id); chrome.tabs.sendMessage(id, { stop: true }).catch(() => {}); }
-      else { playing.add(id); chrome.tabs.sendMessage(id, { play: true }).catch(() => {}); }
-    });
+    const allIds = tabs.map(t => t.id);
+    const anyPlaying = allIds.some(id => playing.has(id));
+    if (anyPlaying) {
+      allIds.forEach(id => {
+        playing.delete(id);
+        chrome.tabs.sendMessage(id, { stop: true }).catch(() => {});
+      });
+    } else {
+      const incompleteTabs = tabs.filter(t => !t.isComplete);
+      incompleteTabs.forEach(t => {
+        playing.add(t.id);
+        chrome.tabs.sendMessage(t.id, { play: true }).catch(() => {});
+      });
+    }
     save();
   },
   stopIfNavigatedAway: (id, url) => {
@@ -66,8 +126,9 @@ export const tabState = {
   getState: () => ({ createdTabs: tabs, playingTabs: [...playing] }),
   clearAllTabs: async () => {
     const ids = tabs.map(t => t.id);
-    tabs = []; playing.clear(); await removeStorage(K);
-    // Also clear any pending cleanup alarms to prevent them from running later
+    tabs = []; playing.clear();
+    // --- FIX: Remove BOTH keys from storage ---
+    await Promise.all([removeStorage(TABS_K), removeStorage(PLAYING_K)]);
     const allAlarms = await chrome.alarms.getAll();
     const cleanupAlarmNames = allAlarms.filter(a => a.name.startsWith('cleanup_tab_')).map(a => a.name);
     if (cleanupAlarmNames.length > 0) {

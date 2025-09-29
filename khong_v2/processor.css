@@ -107,7 +107,7 @@ body {
 
 /* --- MONITOR --- */
 .monitor-entry {
-  font-size: 14px; padding: 12px 16px; /* MODIFIED: Reduced vertical padding */
+  font-size: 14px; padding: 12px 16px;
   border-radius: 6px; margin-bottom: 12px;
   border: 1px solid var(--border-color); border-left-width: 4px;
   transition: border-color 0.2s;
@@ -118,11 +118,17 @@ body {
 .monitor-entry.is-complete .completion-status strong { color: var(--success-color); }
 .monitor-entry.cancelled .completion-status strong { color: var(--danger-color); }
 
-.monitor-entry-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; /* MODIFIED: Reduced margin */ }
-.monitor-entry-header p { margin: 0; } /* ADDED: Ensure no default paragraph margins */
-.monitor-entry-header strong { font-weight: 600; color: var(--text-color); }
+.monitor-entry-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.monitor-entry-header p { margin: 0; }
+.monitor-entry-header strong { font-weight: 600; color: var(--text-color); transition: color 0.2s; /* ADDED: Smooth transition */ }
+
+/* ADDED: This rule turns the header text green on completion. */
+.monitor-entry.is-complete .monitor-entry-header strong {
+  color: var(--success-color);
+}
+
 .completion-status { display: inline-block; margin-left: 8px; }
-.monitor-buttons .btn { width: 30px; height: 30px; /* MODIFIED: Made buttons smaller */ font-size: 14px; border: none; }
+.monitor-buttons .btn { width: 30px; height: 30px; font-size: 14px; border: none; }
 .monitor-buttons .btn:hover:not(:disabled) { background-color: var(--hover-bg); }
 .playing .btn-play { color: var(--accent-color); }
 
@@ -130,7 +136,7 @@ body {
 .card-grid .placeholder { grid-column: 1 / -1; }
 
 /* --- DETAILS, SUMMARY & CODE BLOCKS --- */
-.monitor-entry details { margin-top: 10px; /* MODIFIED: Reduced margin */ }
+.monitor-entry details { margin-top: 10px; }
 .monitor-entry summary { cursor: pointer; font-weight: 500; color: var(--accent-color); user-select: none; }
 .monitor-entry summary:focus { outline: none; }
 .monitor-entry pre, .monitor-response pre, .prompt-details pre {
@@ -138,7 +144,7 @@ body {
   border: 1px solid var(--border-color);
   font-size: 13px; max-height: 250px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
 }
-.response-area { margin-top: 12px; padding-top: 12px; /* MODIFIED: Reduced spacing */ border-top: 1px solid var(--border-color); }
+.response-area { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); }
 .monitor-response h4 { margin: 0 0 10px; font-size: 14px; font-weight: 600; }
 .monitor-response h4 small { font-weight: 400; color: var(--text-light); }
 .prompt-details h4 { margin: 12px 0 0; font-size: 14px; font-weight: 600; }

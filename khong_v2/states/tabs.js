@@ -78,24 +78,32 @@ export const tabState = {
       save();
     }
   },
+  
+  // --- MODIFIED FUNCTION ---
   updateTabResponse: (id, u) => {
     const t = tabs.find(x => x.id === id);
     if (!t) return;
     Object.assign(t, { responseText: u.responseText, responseTimestamp: u.timestamp, isComplete: u.isComplete });
-    if (u.isComplete && playing.has(id)) { 
+
+    // FIX: When a tab reports it is complete, ALWAYS remove it from the 'playing' set
+    // and ALWAYS send a 'stop' command. This prevents audio from getting stuck.
+    if (u.isComplete) { 
       playing.delete(id); 
       chrome.tabs.sendMessage(id, { stop: true }).catch(() => {}); 
     }
     save();
   },
+  // --- END OF MODIFICATION ---
+  
   findInjectableTab: (id) => { const t = tabs.find(x => x.id === id && !x.injected); if (t) t.injected = true; return t; },
   playTab: (id) => {
     const t = tabs.find(x => x.id === id);
     if (!t) return;
+
     if (playing.has(id)) {
       playing.delete(id);
       chrome.tabs.sendMessage(id, { stop: true }).catch(() => {});
-    } else if (!t.isComplete) {
+    } else {
       playing.add(id);
       chrome.tabs.sendMessage(id, { play: true }).catch(() => {});
     }
@@ -127,19 +135,12 @@ export const tabState = {
   clearAllTabs: async () => {
     const ids = tabs.map(t => t.id);
     tabs = []; playing.clear();
-    // --- Remove BOTH keys from storage ---
     await Promise.all([removeStorage(TABS_K), removeStorage(PLAYING_K)]);
     const allAlarms = await chrome.alarms.getAll();
     const cleanupAlarmNames = allAlarms.filter(a => a.name.startsWith('cleanup_tab_')).map(a => a.name);
-
-    // --- FIX: Iterate over the array and clear each alarm individually ---
     if (cleanupAlarmNames.length > 0) {
-      // The API does not accept an array, so we must clear one by one.
-      // Promise.all is an efficient way to do this in parallel.
       await Promise.all(cleanupAlarmNames.map(name => chrome.alarms.clear(name)));
     }
-    // --- END FIX ---
-
     if (ids.length) chrome.tabs.remove(ids).catch(() => {});
     save();
   },

@@ -68,7 +68,7 @@ body {
 #fileInputLabel { border-style: dashed; color: var(--accent-color); border-color: var(--accent-color); }
 #fileInputLabel:hover { background-color: var(--accent-color); color: var(--panel-bg); }
 #clearSaved:hover:not(:disabled) { border-color: var(--danger-color); color: var(--danger-color); }
-#clearAllTabs:hover:not(:disabled) { border-color: var(--danger-color); color: var(--danger-color); }
+#clearAllTabs:hover:not(:disabled), #automationModeBtn:hover:not(:disabled) { border-color: var(--danger-color); color: var(--danger-color); }
 #fileInput { display: none; }
 .theme-btn.active { background-color: var(--accent-color); color: var(--panel-bg); }
 
@@ -81,6 +81,9 @@ body {
   color: var(--text-color); text-align: center;
 }
 #batchOpenCount:focus { outline: none; }
+
+/* --- ACTIVE STATE FOR TOGGLE BUTTONS --- */
+.theme-btn.active, #automationModeBtn.active { background-color: var(--accent-color); color: var(--panel-bg); }
 
 /* --- TOOLTIPS --- */
 [data-tooltip]::before {
@@ -95,6 +98,7 @@ body {
 /* --- CARD GRID & MONITOR ENTRIES --- */
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
 .card {
+  position: relative; /* Needed for the delete button */
   background: transparent; padding: 16px; border-radius: 6px; border: 1px solid var(--border-color);
   cursor: pointer; transition: border-color 0.2s, background-color 0.2s;
 }
@@ -104,6 +108,17 @@ body {
 .card-clicked, .card-clicked:hover { cursor: default; background-color: transparent; border-color: var(--border-color); }
 .card-clicked h3 { color: var(--success-color); }
 .card-clicked pre, .card-clicked small { opacity: 0.7; }
+
+/* --- CARD DELETE BUTTON --- */
+.btn-delete-card {
+  position: absolute; top: 6px; right: 6px; z-index: 2;
+  width: 28px; height: 28px; font-size: 14px;
+  border-radius: 50%; border: 1px solid transparent;
+  display: none; /* Hidden by default */
+}
+.card:hover .btn-delete-card { display: inline-flex; } /* Show on parent hover */
+.btn-delete-card:hover { border-color: var(--danger-color); color: var(--danger-color); }
+
 
 /* --- MONITOR --- */
 .monitor-entry {
@@ -130,6 +145,7 @@ body {
 .completion-status { display: inline-block; margin-left: 8px; }
 .monitor-buttons .btn { width: 30px; height: 30px; font-size: 14px; border: none; }
 .monitor-buttons .btn:hover:not(:disabled) { background-color: var(--hover-bg); }
+.monitor-buttons .btn-close:hover:not(:disabled) { color: var(--danger-color); }
 .playing .btn-play { color: var(--accent-color); }
 
 .placeholder { padding: 40px 20px; text-align: center; color: var(--text-light); }
@@ -149,3 +165,27 @@ body {
 .monitor-response h4 small { font-weight: 400; color: var(--text-light); }
 .prompt-details h4 { margin: 12px 0 0; font-size: 14px; font-weight: 600; }
 .prompt-details h4:first-child { margin-top: 0; }
+
+/* --- MODAL DIALOG STYLES --- */
+.modal {
+  display: none; position: fixed; z-index: 100; left: 0; top: 0;
+  width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5);
+  align-items: center; justify-content: center;
+}
+.modal-content {
+  background-color: var(--panel-bg); color: var(--text-color);
+  margin: auto; border: 1px solid var(--border-color);
+  width: 90%; max-width: 700px; border-radius: 8px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+  display: flex; flex-direction: column; max-height: 80vh;
+}
+.modal-header { padding: 16px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+.modal-header h2 { margin: 0; font-size: 18px; }
+.close-btn { color: var(--text-light); font-size: 28px; font-weight: bold; cursor: pointer; }
+.close-btn:hover, .close-btn:focus { color: var(--text-color); text-decoration: none; }
+.modal-body { padding: 24px; overflow-y: auto; }
+.modal-footer { padding: 16px 24px; border-top: 1px solid var(--border-color); text-align: right; }
+.modal-footer .btn { width: auto; padding: 0 16px; }
+.log-entry { padding: 10px 0; border-bottom: 1px solid var(--border-color); font-size: 14px; }
+.log-entry:last-child { border-bottom: none; }
+.log-entry small { color: var(--text-light); display: block; margin-top: 4px; }

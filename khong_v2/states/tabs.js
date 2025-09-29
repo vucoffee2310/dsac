@@ -9,7 +9,6 @@ let playing = new Set(); // Will be overwritten by storage
 let debounceTimeout = null;
 let throttleTimeout = null;
 
-// --- Load BOTH tabs and playing state from storage on startup ---
 (async () => {
   const [savedTabs, savedPlaying] = await Promise.all([
     getStorage(TABS_K),
@@ -45,17 +44,23 @@ const notify = () => {
   }
 };
 
-// --- Save BOTH tabs and playing state ---
 const save = async () => {
   await Promise.all([
     setStorage(TABS_K, tabs),
-    setStorage(PLAYING_K, [...playing]) // Convert Set to Array for storage
+    setStorage(PLAYING_K, [...playing])
   ]);
   notify();
 };
 
 export const tabState = {
-  addTab: (p) => { if (!tabs.some(t => t.id === p.id)) { tabs.push({ ...p, injected: false, isComplete: false }); save(); } },
+  // --- MODIFIED FUNCTION (No longer plays audio here) ---
+  addTab: (p) => { 
+    if (!tabs.some(t => t.id === p.id)) { 
+      tabs.push({ ...p, injected: false, isComplete: false }); 
+      save(); 
+    } 
+  },
+  // --- END OF MODIFICATION ---
   removeTab: (id) => {
     const t = tabs.find(x => x.id === id);
     if (!t) return;
@@ -79,21 +84,27 @@ export const tabState = {
     }
   },
   
-  // --- MODIFIED FUNCTION ---
   updateTabResponse: (id, u) => {
     const t = tabs.find(x => x.id === id);
     if (!t) return;
     Object.assign(t, { responseText: u.responseText, responseTimestamp: u.timestamp, isComplete: u.isComplete });
 
-    // FIX: When a tab reports it is complete, ALWAYS remove it from the 'playing' set
-    // and ALWAYS send a 'stop' command. This prevents audio from getting stuck.
     if (u.isComplete) { 
       playing.delete(id); 
       chrome.tabs.sendMessage(id, { stop: true }).catch(() => {}); 
     }
     save();
   },
-  // --- END OF MODIFICATION ---
+
+  // --- NEW FUNCTION ---
+  // Called by the automation script once it's actually running inside the tab.
+  startPlaying: (id) => {
+    if (id && !playing.has(id)) {
+        playing.add(id);
+        save();
+    }
+  },
+  // --- END OF NEW FUNCTION ---
   
   findInjectableTab: (id) => { const t = tabs.find(x => x.id === id && !x.injected); if (t) t.injected = true; return t; },
   playTab: (id) => {

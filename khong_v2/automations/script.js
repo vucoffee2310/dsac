@@ -28,19 +28,22 @@ export function automationScript(promptText, cardName) {
   const monitor = async () => {
     while (document.querySelectorAll("ms-chat-turn").length < 3) await w();
     let prev = '', checks = 0;
-    // Check interval is 3 seconds (3000ms).
-    // Inactivity timeout is 12 seconds (4 checks * 3000ms), which satisfies the
-    // requirement for a timeout of at least 10 seconds.
     while (checks < 4) {
       const el = [...document.querySelectorAll("ms-chat-turn")].pop()?.querySelector('[data-turn-role="Model"]');
       const cur = el?.innerText.trim() || '';
       if (cur !== prev) { prev = cur; checks = 0; report(cur, false); } else checks++;
-      await w(5000); // <-- MODIFIED: Changed to 5-second interval
+      await w(5000);
     }
     if (!prev) throw new Error("No response text found.");
     report(prev, true);
   };
+
   (async () => {
+    // 1. Tell the background to update the UI state to "playing".
+    chrome.runtime.sendMessage({ action: "startPlaying" });
+    // 2. Ask the background to send a "play" command back to this very tab's content scripts.
+    chrome.runtime.sendMessage({ action: "requestPlayAudio" }); // <-- MODIFIED ACTION
+
     if (cardName) document.title = cardName;
     badge('processing');
     try {
@@ -63,5 +66,4 @@ export function automationScript(promptText, cardName) {
       report(e.message, true, true);
     }
   })();
-
 }

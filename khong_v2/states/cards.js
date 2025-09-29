@@ -8,7 +8,23 @@ export const addClickedCard = async (id) => { const c = await getClickedCards();
 
 // --- Functions for CARD DATA itself ---
 export const getSavedCards = () => getStorage(CARDS_K).then(v => v ?? []);
-export const saveCards = (lines) => setStorage(CARDS_K, lines);
+export const saveCards = (cardObjects) => setStorage(CARDS_K, cardObjects);
+
+// --- NEW function to remove a single card and its state ---
+export const removeSingleCard = async (cardIdToRemove) => {
+  const [cards, clicked] = await Promise.all([getSavedCards(), getClickedCards()]);
+
+  const updatedCards = cards.filter(c => c.id !== cardIdToRemove);
+  delete clicked[cardIdToRemove];
+
+  await Promise.all([
+    setStorage(CARDS_K, updatedCards),
+    setStorage(CLICKED_K, clicked)
+  ]);
+
+  return updatedCards; // Return the new list for re-rendering
+};
+
 
 // --- Combined Clear Function ---
 // This will now clear both the card data and the clicked state, fully resetting the processor panel.

@@ -26,6 +26,12 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 chrome.tabs.onRemoved.addListener(tabState.removeTab);
 
 chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
+  // The audio content script sends a generic message. We must handle it here.
+  if (req.play) {
+    if (sender.tab) chrome.tabs.sendMessage(sender.tab.id, { play: true }).catch(() => {});
+    return;
+  }
+  
   if (req.action === 'getTabState') return sendResponse(tabState.getState());
   const h = {
     logTabCreation: () => tabState.addTab(req.payload),
@@ -33,6 +39,14 @@ chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
     playTab: () => tabState.playTab(req.tabId),
     playAllTabs: () => tabState.playAllTabs(),
     clearAllTabs: () => tabState.clearAllTabs(),
+    removeSingleTab: () => chrome.tabs.remove(req.tabId).catch(() => {}),
+    startPlaying: () => sender.tab && tabState.startPlaying(sender.tab.id),
+    // --- NEW HANDLER ---
+    // This receives the request from the automation script...
+    requestPlayAudio: () => {
+      // ...and sends a message directly to the content scripts in that specific tab.
+      if (sender.tab) chrome.tabs.sendMessage(sender.tab.id, { play: true }).catch(() => {});
+    },
   };
   const f = h[req.action];
   if (f) {

@@ -7,32 +7,34 @@ const g = document.getElementById('grid'), f = document.getElementById('fileInpu
       batchIn = document.getElementById('batchOpenCount'), themeEl = document.getElementById('themeSwitcher'),
       themeKey = 'selected-card-theme';
 
-// --- NEW: Helper functions to access chrome.storage.local for the theme ---
+// --- Helper functions to access chrome.storage.local for the theme ---
 const getStorage = async (k) => (await chrome.storage.local.get(k))[k];
 const setStorage = (k, v) => chrome.storage.local.set({ [k]: v });
 
 const applyTheme = t => {
   const root = document.documentElement, eff = t === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : t;
   root.setAttribute('data-theme', eff);
-  themeEl.querySelectorAll('.theme-btn').forEach(b => b.classList.toggle('active', b.dataset.theme === t));
+  // FIX: Select all buttons directly within the theme element, not by a specific class
+  themeEl.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.theme === t));
 };
 
 const initTheme = async () => {
-  // --- UPDATED: Read from chrome.storage.local (profile-specific) ---
+  // Read from chrome.storage.local (profile-specific)
   const s = await getStorage(themeKey) || 'system';
   applyTheme(s);
   
   themeEl.addEventListener('click', async (e) => {
-    const b = e.target.closest('.theme-btn');
-    if (b) {
-      // --- UPDATED: Write to chrome.storage.local ---
+    // FIX: Find the closest 'button' element, not '.theme-btn'
+    const b = e.target.closest('button');
+    if (b && b.dataset.theme) { // Ensure the button has a theme
+      // Write to chrome.storage.local
       await setStorage(themeKey, b.dataset.theme);
       applyTheme(b.dataset.theme);
     }
   });
 
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', async () => {
-    // --- UPDATED: Check chrome.storage.local before applying system theme change ---
+    // Check chrome.storage.local before applying system theme change
     const currentTheme = await getStorage(themeKey) || 'system';
     if (currentTheme === 'system') {
       applyTheme('system');

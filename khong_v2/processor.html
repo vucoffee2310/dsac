@@ -3,32 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <title>Card Processor & Monitor</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="processor.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
   <div class="container">
     <div class="panel left-panel">
       <header class="panel-header">
-        <div class="header-top-row">
+        <div class="header-content">
           <h2>Card Processor</h2>
-          <div class="icon-button-group" id="themeSwitcher">
-            <button class="btn theme-btn" data-theme="light" data-tooltip="Light Theme">☀️</button>
-            <button class="btn theme-btn" data-theme="dark" data-tooltip="Dark Theme">🌙</button>
-            <button class="btn theme-btn" data-theme="system" data-tooltip="System Default">🖥️</button>
-          </div>
+          <p>Upload and automate tabs.</p>
         </div>
-        <p>Upload a .txt file. Click a card to send its content to a new AI Studio tab.</p>
+        <div class="icon-button-group" id="themeSwitcher">
+          <button class="btn" data-theme="light" data-tooltip="Light Theme">☀️</button>
+          <button class="btn" data-theme="dark" data-tooltip="Dark Theme">🌙</button>
+          <button class="btn" data-theme="system" data-tooltip="System Default">🖥️</button>
+        </div>
       </header>
       <div class="controls">
-        <label for="fileInput" class="btn btn-primary" data-tooltip="Select .txt File">📂</label>
-        <input type="file" id="fileInput" accept=".txt">
-        <button id="clearSaved" class="btn btn-danger" data-tooltip="Clear Clicked State">🗑️</button>
+        <div class="action-buttons">
+            <label for="fileInput" class="btn" data-tooltip="Select .txt File" id="fileInputLabel">📂</label>
+            <input type="file" id="fileInput" accept=".txt">
+            <button id="clearSaved" class="btn" data-tooltip="Clear All Cards & State">🗑️</button>
+        </div>
         <div class="batch-controls">
           <input type="number" id="batchOpenCount" min="1" placeholder="Qty">
-          <button id="batchOpenBtn" class="btn btn-secondary" data-tooltip="Open Unclicked Tabs">🚀</button>
+          <button id="batchOpenBtn" class="btn" data-tooltip="Open Unclicked Tabs">🚀</button>
         </div>
       </div>
       <div class="card-grid" id="grid">
@@ -39,17 +39,17 @@
     </div>
     <div class="panel right-panel">
       <header class="panel-header">
-        <div class="monitor-header-main">
+        <div class="header-content">
             <h2>Tab Monitor</h2>
-            <div class="icon-button-group">
-              <button id="playAllTabs" class="btn btn-secondary" disabled data-tooltip="Play All">▶️</button>
-              <button id="downloadAllJson" class="btn btn-secondary" disabled data-tooltip="Download All">📥</button>
-              <button id="clearAllTabs" class="btn btn-danger" disabled data-tooltip="Clear All">🗑️</button>
-            </div>
+            <p id="monitorProgress">Awaiting jobs...</p>
         </div>
-        <p id="monitorProgress">Awaiting jobs...</p>
+        <div class="icon-button-group">
+          <button id="playAllTabs" class="btn" disabled data-tooltip="Play/Stop All">▶️</button>
+          <button id="downloadAllJson" class="btn" disabled data-tooltip="Download All">📥</button>
+          <button id="clearAllTabs" class="btn" disabled data-tooltip="Clear & Close All">🗑️</button>
+        </div>
       </header>
-      <div id="createdTabs">
+      <div class="monitor-list" id="createdTabs">
         <div class="placeholder">
           <p>Click a card to monitor its tab.</p>
         </div>

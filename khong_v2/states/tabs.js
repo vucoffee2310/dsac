@@ -1,7 +1,7 @@
 import { getStorage, setStorage, removeStorage } from '../services/storage.js';
 const TABS_K = 'createdTabs_v1';
 const PLAYING_K = 'playingTabs_v1';
-const DEBOUNCE_DELAY = 250; // ms to wait after last event
+const DEBOUNCE_DELAY = 300; // ms to wait after last event
 const THROTTLE_LIMIT = 5000; // ms max wait time between updates
 
 let tabs = [];
@@ -137,4 +137,5 @@ export const tabState = {
     if (ids.length) chrome.tabs.remove(ids).catch(() => {});
     save();
   },
+
 };

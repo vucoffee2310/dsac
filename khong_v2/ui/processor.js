@@ -1,14 +1,14 @@
 import { addClickedCard, clearClickedCards } from '../states/cards.js';
 import { renderCards } from './renderer.js';
 import { PROMPT_PREFIX } from '../services/promptConfig.js';
-import { getStorage, setStorage } from '../services/storage.js';
 
 const g = document.getElementById('grid'), f = document.getElementById('fileInput'),
       clr = document.getElementById('clearSaved'), batchBtn = document.getElementById('batchOpenBtn'),
       batchIn = document.getElementById('batchOpenCount'), themeEl = document.getElementById('themeSwitcher'),
       themeKey = 'selected-card-theme';
 
-const CARDS_STORAGE_KEY = 'cardLines_v1'; // ← NEW: storage key for card content
+// Store card content in memory for the session, not in chrome.storage
+let cardLines = [];
 
 const applyTheme = t => {
   const root = document.documentElement, eff = t === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : t;
@@ -36,17 +36,23 @@ const openCard = async card => {
   const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
   const mod = PROMPT_PREFIX + JSON.stringify(lines);
   const tab = await chrome.tabs.create({ url: "https://aistudio.google.com/prompts/new_chat", active: false });
-  chrome.runtime.sendMessage({ action: "logTabCreation", payload: { id: tab.id, cardName: name, cardContent: mod } });
+  // Send both original and modified content for full transparency
+  chrome.runtime.sendMessage({
+    action: "logTabCreation",
+    payload: {
+      id: tab.id,
+      cardName: name,
+      originalCardContent: content, // The raw, original content
+      cardContent: mod // The transformed prompt sent to the AI
+    }
+  });
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
   initTheme();
 
-  // 🔁 RESTORE SAVED CARDS ON LOAD
-  const savedLines = await getStorage(CARDS_STORAGE_KEY);
-  if (savedLines && Array.isArray(savedLines) && savedLines.length > 0) {
-    renderCards(g, savedLines);
-  }
+  // The page will now start with the placeholder, awaiting a file upload.
+  // The logic to restore cards from chrome.storage has been removed.
 
   g.addEventListener('click', e => { const c = e.target.closest('.card'); c && openCard(c); });
 
@@ -54,15 +60,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const file = e.target.files?.[0];
     if (!file) return;
     const txt = await file.text();
-    const lines = txt.split(/\r?\n/).filter(Boolean);
-    await setStorage(CARDS_STORAGE_KEY, lines);
-    renderCards(g, lines);
+    // Store lines in the module-level variable instead of chrome.storage
+    cardLines = txt.split(/\r?\n/).filter(Boolean);
+    renderCards(g, cardLines);
   });
 
   clr.addEventListener('click', async () => {
     await clearClickedCards();
-    // Optional: also clear saved card content
-    // await setStorage(CARDS_STORAGE_KEY, []);
     alert('✅ Cleared all clicked card states.');
     document.querySelectorAll('.card.card-clicked').forEach(c => c.classList.remove('card-clicked'));
   });

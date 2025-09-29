@@ -8,7 +8,7 @@ export const downloadJSON = (data, name) => {
   document.body.appendChild(l).click(); l.remove(); URL.revokeObjectURL(u);
 };
 
-export async function renderCards(grid, lines, per = 200) {
+export async function renderCards(grid, lines, per = 150) { // <-- Changed from 200 to 150
   if (!lines.length) return grid.innerHTML = '<div class="placeholder"><p>No content in file.</p></div>';
   const n = Math.ceil(lines.length / per);
   grid.innerHTML = Array.from({ length: n }, (_, i) => {
@@ -33,7 +33,15 @@ const createEntry = (t, playing) => {
         <button class="btn btn-download" data-tooltip="Download JSON">📥</button>
       </div>
     </div>
-    <details><summary>View Original Prompt</summary><pre>${esc(t.cardContent ?? '(No content)')}</pre></details>
+    <details>
+      <summary>View Prompts</summary>
+      <div class="prompt-details">
+        <h4>Original Content</h4>
+        <pre>${esc(t.originalCardContent ?? '(No original content saved)')}</pre>
+        <h4>Final Prompt (Sent to AI)</h4>
+        <pre>${esc(t.cardContent ?? '(No final prompt saved)')}</pre>
+      </div>
+    </details>
     <div class="response-area">
       ${t.responseText ? `<details><summary>View AI Response</summary><div class="monitor-response"><h4>AI Response <small>(${t.responseTimestamp})</small></h4><pre>${esc(t.responseText)}</pre></div></details>` : `<div class="monitor-response-placeholder"><p>🤖 Response pending...</p></div>`}
     </div>

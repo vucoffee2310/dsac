@@ -9,7 +9,13 @@ const setupKeepAlive = () => {
   port.onDisconnect.addListener(() => setTimeout(setupKeepAlive, 5000));
 };
 
-const getTabData = t => ({ card_name: t.cardName, prompt_content: t.cardContent || '', ai_response: t.responseText || null, response_timestamp: t.responseTimestamp || null });
+const getTabData = t => ({
+  card_name: t.cardName,
+  original_prompt_content: t.originalCardContent || '',
+  final_prompt_sent: t.cardContent || '',
+  ai_response: t.responseText || null,
+  response_timestamp: t.responseTimestamp || null
+});
 
 const render = s => {
   state = s;

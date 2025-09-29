@@ -18,15 +18,22 @@ export const tabState = {
     if (!t.isComplete) {
       Object.assign(t, { isComplete: true, responseText: "[Cancelled: tab closed before completion]", responseTimestamp: new Date().toLocaleString(), cancelled: true });
       save();
-      setTimeout(() => {
-        const i = tabs.findIndex(x => x.id === id);
-        if (i !== -1 && tabs[i].cancelled) { tabs.splice(i, 1); playing.delete(id); save(); }
-      }, 5000);
+      // Use chrome.alarms for reliable delayed removal instead of setTimeout
+      chrome.alarms.create(`cleanup_tab_${id}`, { delayInMinutes: 0.1 }); // ~6 seconds
     } else {
       const l = tabs.length;
       const wp = playing.delete(id);
       tabs = tabs.filter(x => x.id !== id);
       if (tabs.length !== l || wp) save();
+    }
+  },
+  // New function to be called by the background script's alarm listener
+  finalizeRemove: (id) => {
+    const i = tabs.findIndex(x => x.id === id);
+    if (i !== -1 && tabs[i].cancelled) {
+      tabs.splice(i, 1);
+      playing.delete(id);
+      save();
     }
   },
   updateTabResponse: (id, u) => {
@@ -60,6 +67,12 @@ export const tabState = {
   clearAllTabs: async () => {
     const ids = tabs.map(t => t.id);
     tabs = []; playing.clear(); await removeStorage(K);
+    // Also clear any pending cleanup alarms to prevent them from running later
+    const allAlarms = await chrome.alarms.getAll();
+    const cleanupAlarmNames = allAlarms.filter(a => a.name.startsWith('cleanup_tab_')).map(a => a.name);
+    if (cleanupAlarmNames.length > 0) {
+      await chrome.alarms.clear(cleanupAlarmNames);
+    }
     if (ids.length) chrome.tabs.remove(ids).catch(() => {});
     save();
   },

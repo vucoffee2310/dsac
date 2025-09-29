@@ -28,11 +28,14 @@ export function automationScript(promptText, cardName) {
   const monitor = async () => {
     while (document.querySelectorAll("ms-chat-turn").length < 3) await w();
     let prev = '', checks = 0;
-    while (checks < 5) {
+    // Check interval is 3 seconds (3000ms).
+    // Inactivity timeout is 12 seconds (4 checks * 3000ms), which satisfies the
+    // requirement for a timeout of at least 10 seconds.
+    while (checks < 4) {
       const el = [...document.querySelectorAll("ms-chat-turn")].pop()?.querySelector('[data-turn-role="Model"]');
       const cur = el?.innerText.trim() || '';
       if (cur !== prev) { prev = cur; checks = 0; report(cur, false); } else checks++;
-      await w(500);
+      await w(3000); // <-- Changed to 3-second interval
     }
     if (!prev) throw new Error("No response text found.");
     report(prev, true);

@@ -130,6 +130,13 @@ body {
 .response-area { margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color); }
 .monitor-response h4 { margin: 0 0 10px; font-size: 14px; font-weight: 600; }
 .monitor-response h4 small { font-weight: 400; color: var(--text-light); }
+
+/* Styling for the transparent prompt display */
+.prompt-details { margin-top: 10px; }
+.prompt-details h4 { margin: 12px 0 0; font-size: 14px; font-weight: 600; }
+.prompt-details h4:first-child { margin-top: 0; }
+.prompt-details pre { margin-top: 6px; }
+
 .monitor-entry.cancelled {
   border-color: var(--danger);
   opacity: 0.85;

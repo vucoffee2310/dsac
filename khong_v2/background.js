@@ -5,6 +5,16 @@ chrome.runtime.onConnect.addListener(port => {
   if (port.name === "keepAlive") port.onDisconnect.addListener(() => console.log("Keep-alive lost."));
 });
 
+// Listener for reliable delayed actions from chrome.alarms
+chrome.alarms.onAlarm.addListener(alarm => {
+  if (alarm.name.startsWith('cleanup_tab_')) {
+    const tabId = parseInt(alarm.name.split('_')[2], 10);
+    if (!isNaN(tabId)) {
+      tabState.finalizeRemove(tabId);
+    }
+  }
+});
+
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'loading' && tab.url) tabState.stopIfNavigatedAway(tabId, tab.url);
   if (changeInfo.status === 'complete' && tab.url?.startsWith('https://aistudio.google.com/prompts/new_chat')) {

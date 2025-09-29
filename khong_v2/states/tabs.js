@@ -9,7 +9,7 @@ let playing = new Set(); // Will be overwritten by storage
 let debounceTimeout = null;
 let throttleTimeout = null;
 
-// --- FIX: Load BOTH tabs and playing state from storage on startup ---
+// --- Load BOTH tabs and playing state from storage on startup ---
 (async () => {
   const [savedTabs, savedPlaying] = await Promise.all([
     getStorage(TABS_K),
@@ -45,7 +45,7 @@ const notify = () => {
   }
 };
 
-// --- FIX: Save BOTH tabs and playing state ---
+// --- Save BOTH tabs and playing state ---
 const save = async () => {
   await Promise.all([
     setStorage(TABS_K, tabs),
@@ -127,15 +127,20 @@ export const tabState = {
   clearAllTabs: async () => {
     const ids = tabs.map(t => t.id);
     tabs = []; playing.clear();
-    // --- FIX: Remove BOTH keys from storage ---
+    // --- Remove BOTH keys from storage ---
     await Promise.all([removeStorage(TABS_K), removeStorage(PLAYING_K)]);
     const allAlarms = await chrome.alarms.getAll();
     const cleanupAlarmNames = allAlarms.filter(a => a.name.startsWith('cleanup_tab_')).map(a => a.name);
+
+    // --- FIX: Iterate over the array and clear each alarm individually ---
     if (cleanupAlarmNames.length > 0) {
-      await chrome.alarms.clear(cleanupAlarmNames);
+      // The API does not accept an array, so we must clear one by one.
+      // Promise.all is an efficient way to do this in parallel.
+      await Promise.all(cleanupAlarmNames.map(name => chrome.alarms.clear(name)));
     }
+    // --- END FIX ---
+
     if (ids.length) chrome.tabs.remove(ids).catch(() => {});
     save();
   },
-
 };

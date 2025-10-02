@@ -28,26 +28,30 @@ export function automationScript(promptText, cardName) {
   const monitor = async () => {
     while (document.querySelectorAll("ms-chat-turn").length < 3) await w();
     let prev = '', checks = 0;
-    while (checks < 4) {
+    while (checks < 3) {
       const el = [...document.querySelectorAll("ms-chat-turn")].pop()?.querySelector('[data-turn-role="Model"]');
       const cur = el?.innerText.trim() || '';
       if (cur !== prev) { prev = cur; checks = 0; report(cur, false); } else checks++;
-      await w(5000);
+      await w(2000);
     }
     if (!prev) throw new Error("No response text found.");
     report(prev, true);
   };
 
   (async () => {
-    // 1. Tell the background to update the UI state to "playing".
-    chrome.runtime.sendMessage({ action: "startPlaying" });
-    // 2. Ask the background to send a "play" command back to this very tab's content scripts.
-    chrome.runtime.sendMessage({ action: "requestPlayAudio" }); // <-- MODIFIED ACTION
-
     if (cardName) document.title = cardName;
     badge('processing');
     try {
-      (await wf("ms-model-selector-v3 button")).click(); await w();
+      // Wait for a key element to be ready FIRST.
+      const modelSelector = await wf("ms-model-selector-v3 button");
+
+      // NOW it's safe to request audio playback.
+      // 1. Tell the background to update the UI state to "playing".
+      // 2. Ask the background to send a "play" command back to this very tab's content scripts.
+      chrome.runtime.sendMessage({ action: "startPlaying" });
+
+      // Continue with the automation logic.
+      modelSelector.click(); await w();
       const rows = await wf("ms-model-carousel-row", { all: true });
       if (rows.length > 1) rows[1].querySelector("button")?.click(); await w();
       const sliders = await wf(".mat-mdc-slider.mdc-slider input[type='range']", { all: true });

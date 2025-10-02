@@ -1,23 +1,47 @@
 (() => {
   if (window.__AUDIO_INJECTOR_LOADED__) return;
   window.__AUDIO_INJECTOR_LOADED__ = true;
-  let ctx, src;
-  const buf = (c) => {
-    const b = c.createBuffer(1, 44100, 44100);
-    const d = b.getChannelData(0);
-    for (let i = 0; i < 44100; i++) d[i] = Math.sin(i * 0.142) * 0.0005;
-    return b;
-  };
-  chrome.runtime.onMessage.addListener(m => {
-    if (m.play) {
-      if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-      if (src) src.stop();
-      if (ctx.state === 'suspended') ctx.resume().catch(console.warn);
-      src = ctx.createBufferSource();
-      src.buffer = buf(ctx);
-      src.loop = true;
-      src.connect(ctx.destination);
-      src.start();
-    } else if (m.stop && src) { src.stop(); src = null; }
+
+  let audioContext, oscillator;
+
+  // Constants for the sound, calculated from your original formula
+  const FREQUENCY = (0.142 * 44100) / (2 * Math.PI); // ~996.67 Hz
+  const GAIN = 0.0005; // The volume
+
+  chrome.runtime.onMessage.addListener(message => {
+    if (message.play) {
+      // Lazily create the AudioContext
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+
+      // Stop any sound that is currently playing
+      if (oscillator) {
+        oscillator.stop();
+      }
+
+      // Ensure the context is running (handles browser autoplay policies)
+      if (audioContext.state === 'suspended') {
+        audioContext.resume().catch(console.warn);
+      }
+
+      // Create the audio graph: Oscillator -> Gain -> Output
+      oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      // Configure the sound
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(FREQUENCY, audioContext.currentTime);
+      gainNode.gain.setValueAtTime(GAIN, audioContext.currentTime);
+
+      // Connect the nodes and start the sound
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      oscillator.start();
+
+    } else if (message.stop && oscillator) {
+      oscillator.stop();
+      oscillator = null; // Allow the node to be garbage collected
+    }
   });
 })();

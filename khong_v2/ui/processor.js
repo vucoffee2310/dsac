@@ -7,6 +7,24 @@ const g = document.getElementById('grid'), f = document.getElementById('fileInpu
       batchIn = document.getElementById('batchOpenCount'), themeEl = document.getElementById('themeSwitcher'),
       themeKey = 'selected-card-theme';
 
+// Configuration Modal Elements
+const configModal = document.getElementById('configModal');
+const closeConfigModal = document.getElementById('closeConfigModal');
+const cancelConfigBtn = document.getElementById('cancelConfigBtn');
+const confirmConfigBtn = document.getElementById('confirmConfigBtn');
+const customPromptSection = document.getElementById('customPromptSection');
+const customPromptInput = document.getElementById('customPromptInput');
+
+// Store file temporarily while config is open
+let pendingFile = null;
+
+// Storage keys for configuration
+const CONFIG_KEYS = {
+  contentFormat: 'config_contentFormat',
+  promptSource: 'config_promptSource',
+  customPrompt: 'config_customPrompt'
+};
+
 // --- Helper functions to access chrome.storage.local for the theme ---
 const getStorage = async (k) => (await chrome.storage.local.get(k))[k];
 const setStorage = (k, v) => chrome.storage.local.set({ [k]: v });
@@ -37,6 +55,100 @@ const initTheme = async () => {
   });
 };
 
+// --- Configuration Modal Functions ---
+const loadConfigState = async () => {
+  const [contentFormat, promptSource, customPrompt] = await Promise.all([
+    getStorage(CONFIG_KEYS.contentFormat),
+    getStorage(CONFIG_KEYS.promptSource),
+    getStorage(CONFIG_KEYS.customPrompt)
+  ]);
+
+  // Set radio buttons
+  document.querySelector(`input[name="contentFormat"][value="${contentFormat || 'original'}"]`).checked = true;
+  document.querySelector(`input[name="promptSource"][value="${promptSource || 'file'}"]`).checked = true;
+  
+  // Set custom prompt if exists
+  if (customPrompt) {
+    customPromptInput.value = customPrompt;
+  }
+
+  // Show/hide custom prompt section
+  customPromptSection.style.display = (promptSource === 'custom') ? 'block' : 'none';
+};
+
+const saveConfigState = async () => {
+  const contentFormat = document.querySelector('input[name="contentFormat"]:checked').value;
+  const promptSource = document.querySelector('input[name="promptSource"]:checked').value;
+  const customPrompt = customPromptInput.value;
+
+  await Promise.all([
+    setStorage(CONFIG_KEYS.contentFormat, contentFormat),
+    setStorage(CONFIG_KEYS.promptSource, promptSource),
+    setStorage(CONFIG_KEYS.customPrompt, customPrompt)
+  ]);
+
+  return { contentFormat, promptSource, customPrompt };
+};
+
+const openConfigModal = () => {
+  loadConfigState();
+  configModal.style.display = 'flex';
+};
+
+const closeConfigModalFn = () => {
+  configModal.style.display = 'none';
+  pendingFile = null;
+  f.value = ''; // Reset file input
+};
+
+// --- File Processing Functions ---
+const formatContent = (lines, contentFormat) => {
+  if (contentFormat === 'array') {
+    return '```\n' + JSON.stringify(lines) + '\n```';
+  }
+  return lines.join('\n');
+};
+
+const getPromptPrefix = async (promptSource, customPrompt) => {
+  if (promptSource === 'custom' && customPrompt) {
+    return customPrompt;
+  }
+  return PROMPT_PREFIX;
+};
+
+const processFile = async (file, config) => {
+  const txt = await file.text();
+  const allLines = txt.split(/\r?\n/).filter(Boolean);
+  
+  const per = 150;
+  const numChunks = Math.ceil(allLines.length / per);
+  
+  const promptPrefix = await getPromptPrefix(config.promptSource, config.customPrompt);
+  
+  const cardObjects = Array.from({ length: numChunks }, (_, i) => {
+    const chunkLines = allLines.slice(i * per, (i + 1) * per);
+    const idx = i + 1;
+    
+    // Format the content based on user preference
+    const formattedContent = formatContent(chunkLines, config.contentFormat);
+    
+    // Combine prompt prefix with formatted content
+    const finalContent = config.contentFormat === 'array' 
+      ? `${promptPrefix}\n${formattedContent}`
+      : formattedContent;
+    
+    return { 
+      id: `card_${idx}`, 
+      name: `${idx}`, 
+      content: finalContent,
+      originalLines: chunkLines // Store original for reference
+    };
+  });
+  
+  await saveCards(cardObjects);
+  renderCards(g, cardObjects);
+};
+
 const w = ms => new Promise(r => setTimeout(r, ms));
 
 const openCard = async card => {
@@ -44,17 +156,30 @@ const openCard = async card => {
   card.classList.add('card-clicked');
   const { id, name, content } = card.dataset;
   await addClickedCard(id);
-  const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
-  const mod = PROMPT_PREFIX + JSON.stringify(lines);
+  
+  // Get current config to determine if we need additional formatting
+  const config = {
+    contentFormat: await getStorage(CONFIG_KEYS.contentFormat) || 'original',
+    promptSource: await getStorage(CONFIG_KEYS.promptSource) || 'file',
+    customPrompt: await getStorage(CONFIG_KEYS.customPrompt) || ''
+  };
+  
+  const promptPrefix = await getPromptPrefix(config.promptSource, config.customPrompt);
+  
+  // If using array format and prompt from file, ensure proper structure
+  const finalContent = config.contentFormat === 'array' && config.promptSource === 'file'
+    ? content // Already formatted during processing
+    : content;
+  
   const tab = await chrome.tabs.create({ url: "https://aistudio.google.com/prompts/new_chat", active: false });
   chrome.runtime.sendMessage({
     action: "logTabCreation",
     payload: { 
         id: tab.id, 
-        cardId: id, // <-- ADDED: Pass the card's unique ID
+        cardId: id,
         cardName: name, 
-        originalCardContent: content, 
-        cardContent: mod 
+        originalCardContent: content,
+        cardContent: finalContent
     }
   });
 };
@@ -66,37 +191,61 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderCards(g, savedCardsData);
   }
 
+  // --- Configuration Modal Listeners ---
+  document.querySelectorAll('input[name="promptSource"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      customPromptSection.style.display = e.target.value === 'custom' ? 'block' : 'none';
+    });
+  });
+
+  closeConfigModal.addEventListener('click', closeConfigModalFn);
+  cancelConfigBtn.addEventListener('click', closeConfigModalFn);
+  
+  confirmConfigBtn.addEventListener('click', async () => {
+    if (!pendingFile) {
+      closeConfigModalFn();
+      return;
+    }
+
+    const config = await saveConfigState();
+    configModal.style.display = 'none';
+    
+    await processFile(pendingFile, config);
+    
+    pendingFile = null;
+    f.value = '';
+  });
+
+  // Close modal when clicking outside
+  window.addEventListener('click', (e) => {
+    if (e.target === configModal) {
+      closeConfigModalFn();
+    }
+  });
+
+  // --- File Input Handler ---
+  f.addEventListener('change', async e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    pendingFile = file;
+    openConfigModal();
+  });
+
+  // --- Card Grid Handlers ---
   g.addEventListener('click', async e => {
     const deleteBtn = e.target.closest('.btn-delete-card');
     if (deleteBtn) {
-      e.stopPropagation(); // Prevent card from opening
+      e.stopPropagation();
       const card = e.target.closest('.card');
       if (card && confirm(`Are you sure you want to delete card ${card.dataset.name}?`)) {
         const updatedCards = await removeSingleCard(card.dataset.id);
-        renderCards(g, updatedCards); // Re-render the grid with the modified data
+        renderCards(g, updatedCards);
       }
       return;
     }
     const cardToOpen = e.target.closest('.card');
     if (cardToOpen) openCard(cardToOpen);
-  });
-
-  f.addEventListener('change', async e => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const txt = await file.text();
-    const allLines = txt.split(/\r?\n/).filter(Boolean);
-    
-    const per = 150;
-    const numChunks = Math.ceil(allLines.length / per);
-    const cardObjects = Array.from({ length: numChunks }, (_, i) => {
-      const chunkLines = allLines.slice(i * per, (i + 1) * per);
-      const idx = i + 1;
-      return { id: `card_${idx}`, name: `${idx}`, content: chunkLines.join('\n') };
-    });
-    
-    await saveCards(cardObjects);
-    renderCards(g, cardObjects);
   });
 
   clr.addEventListener('click', async () => {
@@ -125,7 +274,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // --- NEW: Automation chain listener for cleanup ---
   document.addEventListener('removeProcessedCard', async (e) => {
     const { cardId } = e.detail;
     if (cardId) {

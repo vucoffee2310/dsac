@@ -58,16 +58,20 @@ const handleAutomation = async (newState) => {
             timestamp: new Date().toLocaleString()
         });
 
-        // Action 2: Save data automatically
-        downloadJSON(getTabData(t), fileName);
+        // Action 2: Save data automatically via the background script.
+        // This is now asynchronous and doesn't block the UI.
+        chrome.runtime.sendMessage({
+          action: "downloadFile",
+          payload: { data: getTabData(t), fileName: fileName }
+        });
 
-        setTimeout(() => {
-          chrome.runtime.sendMessage({ action: "removeSingleTab", tabId: t.id });
-          if (t.cardId) {
-            document.dispatchEvent(new CustomEvent('removeProcessedCard', { detail: { cardId: t.cardId } }));
-          }
-          document.dispatchEvent(new CustomEvent('openNextCard'));
-        }, 500);
+        // The 500ms wait is REMOVED. The following actions happen immediately.
+        // This makes the automation chain significantly faster.
+        chrome.runtime.sendMessage({ action: "removeSingleTab", tabId: t.id });
+        if (t.cardId) {
+          document.dispatchEvent(new CustomEvent('removeProcessedCard', { detail: { cardId: t.cardId } }));
+        }
+        document.dispatchEvent(new CustomEvent('openNextCard'));
       }
       // Action 3: Save the updated log
       await saveLog(log);

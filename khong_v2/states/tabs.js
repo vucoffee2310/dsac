@@ -1,8 +1,8 @@
 import { getStorage, setStorage, removeStorage } from '../services/storage.js';
 const TABS_K = 'createdTabs_v1';
 const PLAYING_K = 'playingTabs_v1';
-const DEBOUNCE_DELAY = 300; // ms to wait after last event
-const THROTTLE_LIMIT = 5000; // ms max wait time between updates
+const DEBOUNCE_DELAY = 200; // ms to wait after last event
+const THROTTLE_LIMIT = 3000; // ms max wait time between updates
 
 let tabs = [];
 let playing = new Set(); // Will be overwritten by storage
@@ -30,9 +30,19 @@ const executeNotification = async () => {
 
   try {
     const payload = { createdTabs: tabs, playingTabs: [...playing] };
-    const ts = await chrome.tabs.query({ url: chrome.runtime.getURL("processor.html") });
-    await Promise.allSettled(ts.map(t => chrome.tabs.sendMessage(t.id, { action: "updateTabState", payload })));
-  } catch (e) { console.error("Notify failed:", e); }
+    const ts = await chrome.tabs.query({ url: chrome.runtime.getURL("processor.html") }).catch(() => []);
+    if (ts && ts.length > 0) {
+      await Promise.allSettled(ts.map(t => 
+        chrome.tabs.sendMessage(t.id, { action: "updateTabState", payload })
+          .catch(() => {}) // Ignore individual message failures
+      ));
+    }
+  } catch (e) { 
+    // Suppress "No SW" errors during extension reload
+    if (!e.message?.includes('No SW')) {
+      console.error("Notify failed:", e); 
+    }
+  }
 };
 
 const notify = () => {
@@ -44,30 +54,46 @@ const notify = () => {
   }
 };
 
-const save = async () => {
-  await Promise.all([
-    setStorage(TABS_K, tabs),
-    setStorage(PLAYING_K, [...playing])
-  ]);
-  notify();
+// Save with optional skipNotify parameter
+const save = async (skipNotify = false) => {
+  try {
+    await Promise.all([
+      setStorage(TABS_K, tabs),
+      setStorage(PLAYING_K, [...playing])
+    ]);
+    if (!skipNotify) {
+      notify();
+    }
+  } catch (e) {
+    // Suppress errors during extension reload
+    if (!e.message?.includes('No SW') && !e.message?.includes('Extension context invalidated')) {
+      console.error("Save failed:", e);
+    }
+  }
 };
 
 export const tabState = {
-  // --- MODIFIED FUNCTION (No longer plays audio here) ---
   addTab: (p) => { 
     if (!tabs.some(t => t.id === p.id)) { 
       tabs.push({ ...p, injected: false, isComplete: false }); 
       save(); 
     } 
   },
-  // --- END OF MODIFICATION ---
+  
   removeTab: (id) => {
     const t = tabs.find(x => x.id === id);
     if (!t) return;
     if (!t.isComplete) {
-      Object.assign(t, { isComplete: true, responseText: "[Cancelled: tab closed before completion]", responseTimestamp: new Date().toLocaleString(), cancelled: true });
-      save();
-      chrome.alarms.create(`cleanup_tab_${id}`, { delayInMinutes: 0.1 });
+      Object.assign(t, { 
+        isComplete: true, 
+        responseText: "[Cancelled: tab closed before completion]", 
+        responseTimestamp: new Date().toLocaleString(), 
+        cancelled: true 
+      });
+      save(true).then(() => {
+        executeNotification(); 
+      }).catch(() => {}); // Handle potential errors silently
+      chrome.alarms.create(`cleanup_tab_${id}`, { delayInMinutes: 0.1 }).catch(() => {});
     } else {
       const l = tabs.length;
       const wp = playing.delete(id);
@@ -75,6 +101,7 @@ export const tabState = {
       if (tabs.length !== l || wp) save();
     }
   },
+  
   finalizeRemove: (id) => {
     const i = tabs.findIndex(x => x.id === id);
     if (i !== -1 && tabs[i].cancelled) {
@@ -87,26 +114,35 @@ export const tabState = {
   updateTabResponse: (id, u) => {
     const t = tabs.find(x => x.id === id);
     if (!t) return;
-    Object.assign(t, { responseText: u.responseText, responseTimestamp: u.timestamp, isComplete: u.isComplete });
+    Object.assign(t, { 
+      responseText: u.responseText, 
+      responseTimestamp: u.timestamp, 
+      isComplete: u.isComplete 
+    });
 
     if (u.isComplete) { 
       playing.delete(id); 
-      chrome.tabs.sendMessage(id, { stop: true }).catch(() => {}); 
+      chrome.tabs.sendMessage(id, { stop: true }).catch(() => {});
+      save(true).then(executeNotification).catch(() => {});
+    } else {
+      save();
     }
-    save();
   },
 
-  // --- NEW FUNCTION ---
-  // Called by the automation script once it's actually running inside the tab.
   startPlaying: (id) => {
     if (id && !playing.has(id)) {
         playing.add(id);
+        chrome.tabs.sendMessage(id, { play: true }).catch(() => {});
         save();
     }
   },
-  // --- END OF NEW FUNCTION ---
   
-  findInjectableTab: (id) => { const t = tabs.find(x => x.id === id && !x.injected); if (t) t.injected = true; return t; },
+  findInjectableTab: (id) => { 
+    const t = tabs.find(x => x.id === id && !x.injected); 
+    if (t) t.injected = true; 
+    return t; 
+  },
+  
   playTab: (id) => {
     const t = tabs.find(x => x.id === id);
     if (!t) return;
@@ -120,6 +156,7 @@ export const tabState = {
     }
     save();
   },
+  
   playAllTabs: () => {
     const allIds = tabs.map(t => t.id);
     const anyPlaying = allIds.some(id => playing.has(id));
@@ -137,22 +174,34 @@ export const tabState = {
     }
     save();
   },
+  
   stopIfNavigatedAway: (id, url) => {
     const isAI = url?.startsWith('https://aistudio.google.com/prompts/new_chat');
     const known = tabs.some(t => t.id === id);
     if (known && !isAI && playing.delete(id)) save();
   },
+  
   getState: () => ({ createdTabs: tabs, playingTabs: [...playing] }),
+  
   clearAllTabs: async () => {
     const ids = tabs.map(t => t.id);
-    tabs = []; playing.clear();
-    await Promise.all([removeStorage(TABS_K), removeStorage(PLAYING_K)]);
-    const allAlarms = await chrome.alarms.getAll();
-    const cleanupAlarmNames = allAlarms.filter(a => a.name.startsWith('cleanup_tab_')).map(a => a.name);
-    if (cleanupAlarmNames.length > 0) {
-      await Promise.all(cleanupAlarmNames.map(name => chrome.alarms.clear(name)));
+    tabs = []; 
+    playing.clear();
+    
+    try {
+      await Promise.all([removeStorage(TABS_K), removeStorage(PLAYING_K)]);
+      const allAlarms = await chrome.alarms.getAll();
+      const cleanupAlarmNames = allAlarms.filter(a => a.name.startsWith('cleanup_tab_')).map(a => a.name);
+      if (cleanupAlarmNames.length > 0) {
+        await Promise.all(cleanupAlarmNames.map(name => chrome.alarms.clear(name)));
+      }
+      if (ids.length) chrome.tabs.remove(ids).catch(() => {});
+      save();
+    } catch (e) {
+      // Suppress errors during extension reload
+      if (!e.message?.includes('No SW') && !e.message?.includes('Extension context invalidated')) {
+        console.error("Clear tabs failed:", e);
+      }
     }
-    if (ids.length) chrome.tabs.remove(ids).catch(() => {});
-    save();
   },
 };

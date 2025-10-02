@@ -41,11 +41,23 @@ chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
     clearAllTabs: () => tabState.clearAllTabs(),
     removeSingleTab: () => chrome.tabs.remove(req.tabId).catch(() => {}),
     startPlaying: () => sender.tab && tabState.startPlaying(sender.tab.id),
-    // --- NEW HANDLER ---
-    // This receives the request from the automation script...
-    requestPlayAudio: () => {
-      // ...and sends a message directly to the content scripts in that specific tab.
-      if (sender.tab) chrome.tabs.sendMessage(sender.tab.id, { play: true }).catch(() => {});
+    downloadFile: () => {
+      const { data, fileName } = req.payload;
+      
+      // --- START OF FIX ---
+      // REPLACED: Blob URL which is not available in Service Workers.
+      // const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      // const url = URL.createObjectURL(blob);
+
+      // WITH: A self-contained Data URL, which works perfectly in Service Workers.
+      const content = JSON.stringify(data, null, 2);
+      const url = 'data:application/json;charset=utf-8,' + encodeURIComponent(content);
+      // --- END OF FIX ---
+
+      chrome.downloads.download({
+        url: url,
+        filename: fileName
+      });
     },
   };
   const f = h[req.action];
